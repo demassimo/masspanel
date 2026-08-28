@@ -2223,7 +2223,7 @@ function Licenses() {
     <>
       <header className="page-header"><div><h1>Open-source components</h1><p>Source, version, licence and deployment status for code used or prepared by MassPanel.</p></div></header>
       <section className="table-area">
-        <div className="hosting-plan-banner"><span><b>Source transparency</b> · MassPanel is AGPL-3.0-or-later. The complete deployed source, Grommunio modification and licence notices are available without charge.</span><a className="secondary" href="/masspanel-corresponding-source.tar.gz">Download source</a></div>
+        <div className="hosting-plan-banner"><span><b>Source transparency</b> · MassPanel is AGPL-3.0-or-later. The complete deployed source, Grommunio modification and licence notices are available without charge.</span><span><a className="secondary" href="https://github.com/demassimo/masspanel" target="_blank" rel="noreferrer">GitHub</a> <a className="secondary" href="/masspanel-corresponding-source.tar.gz">Exact source</a></span></div>
         <div className="table-wrap">
           <table>
             <thead><tr><th>Component</th><th>Purpose</th><th>Licence</th><th>Status</th><th>Source</th></tr></thead>
