@@ -1,5 +1,5 @@
 {
-  "summary": "GitHub-ready public beta source release",
+  "summary": "First GitHub public beta release",
   "components": [
     {"name": "MassPanel licence", "description": "Declares MassPanel AGPL-3.0-or-later with commercial use and paid support permitted."},
     {"name": "Grommunio declaration", "description": "Records the exact modified grommunio Web file, base commit, purpose and modification date."},
@@ -10,6 +10,7 @@
     {"name": "Public documentation", "description": "Adds installation, security, privacy, support, contribution, Cloudflare and release-gate documentation."},
     {"name": "Release sanitization", "description": "Rejects Cloudflare-token and private-key patterns and removes generated Python caches from release archives."},
     {"name": "Reliable updates", "description": "Avoids refreshing external package repositories when required firewall packages are already installed."},
-    {"name": "Public source defaults", "description": "Removes the original deployment mail hostname fallback and adds GitHub community templates."}
+    {"name": "Public source defaults", "description": "Removes the original deployment mail hostname fallback and adds GitHub community templates."},
+    {"name": "Licence discovery", "description": "Uses the standard AGPL text at the repository root while retaining upstream notices under third_party."}
   ]
 }
