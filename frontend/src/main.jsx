@@ -1,0 +1,20 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './app/App.jsx';
+import { PanelErrorBoundary } from './legacy.jsx';
+import './styles.css';
+import './roles.css';
+import './design.css';
+import './hosting.css';
+import './apps.css';
+import './panel-v2.css';
+import './workspace.css';
+import './store-code.css';
+import './drawer-scroll.css';
+import './mail-security.css';
+import './firewall.css';
+import './storage.css';
+
+const root = document.getElementById('root');
+if (!root) throw new Error('MassPanel root element is missing.');
+createRoot(root).render(<PanelErrorBoundary><App /></PanelErrorBoundary>);

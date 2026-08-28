@@ -1,0 +1,17 @@
+[Unit]
+Description=MassPanel independent root updater
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/opt/masspanel-updater/venv/bin/python /opt/masspanel-updater/current/masspanel-updater.py auto
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+ProtectHome=true
+UMask=0077
+

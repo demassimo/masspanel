@@ -1,0 +1,21 @@
+.licence-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 0 18px 18px;
+}
+
+.licence-actions .licence-remove {
+  color: #b42318;
+  border-color: #f0b8b4;
+  background: #fff;
+}
+
+.licence-actions .licence-remove:hover {
+  background: #fff4f3;
+  border-color: #df7f78;
+}
+
+@media (max-width: 520px) {
+  .licence-actions button { width: 100%; }
+}

@@ -1,0 +1,37 @@
+.drawer {
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.drawer > header {
+  flex: 0 0 76px;
+}
+
+.drawer > form {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-bottom: 0;
+}
+
+.drawer > form::-webkit-scrollbar { width: 10px; }
+.drawer > form::-webkit-scrollbar-track { background: #f3f6fa; }
+.drawer > form::-webkit-scrollbar-thumb {
+  background: #b7c3d2;
+  border: 2px solid #f3f6fa;
+  border-radius: 8px;
+}
+.drawer > form::-webkit-scrollbar-thumb:hover { background: #8fa0b5; }
+
+.drawer > form > footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: #fff;
+}

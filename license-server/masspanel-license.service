@@ -1,0 +1,24 @@
+[Unit]
+Description=MassPanel licensing service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=masspanel-license
+Group=masspanel-license
+WorkingDirectory=/opt/masspanel-license
+EnvironmentFile=/etc/masspanel-license.env
+ExecStart=/opt/masspanel-license/venv/bin/gunicorn --workers 2 --threads 4 --timeout 30 --bind 127.0.0.1:8081 app:app
+Restart=on-failure
+RestartSec=3
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/masspanel-license
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target
+

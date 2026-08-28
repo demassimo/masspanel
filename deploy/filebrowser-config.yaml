@@ -1,0 +1,49 @@
+server:
+  port: 8091
+  socket: "/run/masspanel-filebrowser/filebrowser.sock"
+  baseURL: "/file-tool"
+  database: "/var/lib/masspanel/filebrowser/filebrowser.db"
+  cacheDir: "/var/lib/masspanel/filebrowser/cache"
+  logging:
+    - levels: "info|warning|error"
+  sources:
+    - name: "Hosting files"
+      path: "/home"
+      config:
+        defaultEnabled: true
+        defaultUserScope: "/"
+        createUserDir: true
+auth:
+  tokenExpirationHours: 8
+  methods:
+    password:
+      enabled: false
+    proxy:
+      enabled: true
+      header: "X-Forwarded-User"
+      createUser: true
+      adminGroup: "admin"
+      groupsClaim: "X-MassPanel-Groups"
+frontend:
+  name: "MassPanel File Manager"
+  disableDefaultLinks: true
+  disableUsedPercentage: true
+userDefaults:
+  listing:
+    viewMode: "normal"
+    showHidden: false
+    showSelectMultiple: true
+    quickDownload: true
+  account:
+    permissions:
+      api: false
+      admin: false
+      modify: true
+      share: false
+      realtime: false
+      delete: true
+      create: true
+      download: true
+    lockPassword: true
+    disableSettings: false
+    loginMethod: "proxy"

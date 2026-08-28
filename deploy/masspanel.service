@@ -1,0 +1,21 @@
+[Unit]
+Description=MassPanel administration API
+After=network.target
+
+[Service]
+Type=simple
+User=masspanel
+Group=masspanel
+WorkingDirectory=/opt/masspanel/backend
+EnvironmentFile=/etc/masspanel/masspanel.env
+ExecStart=/opt/masspanel/venv/bin/gunicorn --workers 1 --threads 4 --timeout 600 --graceful-timeout 30 --bind 127.0.0.1:8100 app:app
+Restart=on-failure
+RestartSec=3
+PrivateTmp=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

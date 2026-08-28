@@ -1,0 +1,43 @@
+[DEFAULT]
+bantime = 1h
+findtime = 10m
+maxretry = 5
+bantime.increment = true
+bantime.factor = 2
+bantime.maxtime = 7d
+banaction = nftables-multiport
+ignorecommand = /usr/local/libexec/masspanel-fail2ban-ignore <ip>
+
+[sshd]
+enabled = true
+backend = systemd
+mode = aggressive
+port = ssh
+
+[masspanel-auth]
+enabled = true
+backend = systemd
+journalmatch = _SYSTEMD_UNIT=masspanel.service
+port = http,https,8443
+maxretry = 6
+
+[grommunio-web-auth]
+enabled = true
+backend = auto
+logpath = /var/log/nginx/nginx-web-error.log
+port = http,https
+maxretry = 6
+
+[postfix-sasl]
+enabled = true
+backend = systemd
+port = smtp,465,submission
+maxretry = 5
+
+[nginx-botsearch]
+enabled = true
+backend = auto
+logpath = /var/log/nginx/*error.log
+port = http,https
+maxretry = 4
+

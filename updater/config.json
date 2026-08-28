@@ -1,0 +1,6 @@
+{
+  "manifest_url": "https://masspanel.masscomputing.co.za/releases/beta/manifest.json",
+  "channel": "beta",
+  "automatic_updates": false,
+  "retain_backups": 3
+}

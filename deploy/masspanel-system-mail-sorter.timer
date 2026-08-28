@@ -1,0 +1,11 @@
+[Unit]
+Description=Sort MassPanel system mailbox regularly
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+RandomizedDelaySec=15
+Persistent=true
+
+[Install]
+WantedBy=timers.target

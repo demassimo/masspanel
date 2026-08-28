@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily MassPanel licence backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+RandomizedDelaySec=900
+
+[Install]
+WantedBy=timers.target

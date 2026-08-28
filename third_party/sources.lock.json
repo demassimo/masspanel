@@ -1,0 +1,20 @@
+{
+  "schema": 2,
+  "generated": "2026-08-28",
+  "masspanel_license": "AGPL-3.0-or-later",
+  "modifications": [{"component":"grommunio Web","base_commit":"f26f375c3102006a899e2c25b3b7fc983ac7257b","date":"2026-08-28","path":"deploy/runtime-patches/class.webappauthentication.php","purpose":"Administrator-assisted mailbox access and suspended-mailbox handling","license":"AGPL-3.0-or-later"}],
+  "sources": [
+    {"name":"Gromox reference","version":"3.9","commit":"f05be4a3cab5b5f08db06af058025e9644efacc6","url":"https://github.com/grommunio/gromox","archive":"source-archives/gromox-3.9.tar.gz","sha256":"0B5125F8C2017037F7088E66B9BD8C52ADD960C2849B932346CEBEA5F7E393E7","license":"AGPL-3.0-or-later","status":"reference-source"},
+    {"name":"grommunio Web reference","version":"4.5.1","commit":"0e2124122ccdec963ab9c8b4928c18cda4d4c25f","url":"https://github.com/grommunio/grommunio-web","archive":"source-archives/grommunio-web-4.5.1.tar.gz","sha256":"5243339A5CB40561B2A165E1901182504000AA69D14A024AB6A311403DB6217B","license":"AGPL-3.0-or-later","status":"reference-source"},
+    {"name":"Admin API reference","version":"1.20","url":"https://github.com/grommunio/admin-api","archive":"source-archives/admin-api-1.20.tar.gz","sha256":"D49B75C5451F16DB6BBA33BE8700A857D5DFD55DBE1C57926950522B89D1DB9C","license":"AGPL-3.0","status":"reference-source"},
+    {"name":"Admin Web reference","version":"5.0.0","url":"https://github.com/grommunio/admin-web","archive":"source-archives/admin-web-5.0.0.tar.gz","sha256":"236B75FAB76DB71A1857E700DE42DD912738A9A92A445175FC0DD2AC5744ADAC","license":"AGPL-3.0","status":"reference-source"},
+    {"name":"Sync reference","version":"2.5","url":"https://github.com/grommunio/grommunio-sync","archive":"source-archives/grommunio-sync-2.5.tar.gz","sha256":"6B9E15C5860EBB7510127DB4EC683A72B750AF3E29D74EA6F84070FBDFA3DAE2","license":"AGPL-3.0","status":"reference-source"},
+    {"name":"DAV reference","version":"1.7","url":"https://github.com/grommunio/grommunio-dav","archive":"source-archives/grommunio-dav-1.7.tar.gz","sha256":"79814135F6F159A21E73AEEC38D187C5B010711E9C6FE2D1E785BC9C42A610E6","license":"AGPL-3.0","status":"reference-source"},
+    {"name":"Gromox runtime","version":"e85e712","commit":"e85e7120f5f0954f2852681b616c3b30f6d4843d","url":"https://github.com/grommunio/gromox","archive":"source-archives/runtime-gromox-e85e712.tar.gz","sha256":"2F83EDC68895626EC2D86ADC0B33AB659921045907F8FB226B48243F393CAF6B","license":"AGPL-3.0-or-later","status":"deployed-unmodified"},
+    {"name":"grommunio Web runtime","version":"f26f375c3","commit":"f26f375c3102006a899e2c25b3b7fc983ac7257b","url":"https://github.com/grommunio/grommunio-web","archive":"source-archives/runtime-grommunio-web-f26f375c3.tar.gz","sha256":"7E193028B4E6F6DB0FE47F9A99703CB3467F7ADC4D59A1AC0C65035F9BF2BD3D","license":"AGPL-3.0-or-later","status":"deployed-with-masspanel-patch"},
+    {"name":"Admin API runtime","version":"9f1ba46","commit":"9f1ba465376a1666cd8200afce8fe9267e146910","url":"https://github.com/grommunio/admin-api","archive":"source-archives/runtime-admin-api-9f1ba46.tar.gz","sha256":"0C6CE5816094E44100164B5707626989F049E1BAFE2B6AD4C6B8D94F90801584","license":"AGPL-3.0","status":"deployed-unmodified"},
+    {"name":"Sync runtime","version":"0d70954","commit":"0d7095456f582082375f5c2992d4b2f3f4fb0431","url":"https://github.com/grommunio/grommunio-sync","archive":"source-archives/runtime-grommunio-sync-0d70954.tar.gz","sha256":"C218EBCCCDF53CC0CCE586F2127288EDE0ADF8BF0C3E4F75636FF114F1C11755","license":"AGPL-3.0","status":"deployed-unmodified"},
+    {"name":"DAV runtime","version":"752697a","commit":"752697a7f9a834cd3913eb219563fae1f8a60723","url":"https://github.com/grommunio/grommunio-dav","archive":"source-archives/runtime-grommunio-dav-752697a.tar.gz","sha256":"FC2EC4D7EE3FD6D9E14BA2A0CC905CA2D1A78E2A996A21A5E47CA2B6FB182993","license":"AGPL-3.0","status":"deployed-unmodified"}
+  ],
+  "excluded": [{"archive":"source-archives/gromox-container-0.0.4.tar.gz","reason":"Historical snapshot has no included licence file and is excluded from releases."}]
+}

@@ -1,0 +1,7 @@
+[Unit]
+Description=Back up MassPanel licence database and signing keys
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/masspanel-license-backup
+

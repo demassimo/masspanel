@@ -1,0 +1,30 @@
+[Unit]
+Description=MassPanel FileBrowser Quantum
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+Environment=FILEBROWSER_CONFIG=/etc/masspanel/filebrowser.yaml
+ExecStart=/usr/local/bin/masspanel-filebrowser
+ExecStartPost=/bin/sh -c 'for i in 1 2 3 4 5 6 7 8 9 10; do if [ -S /run/masspanel-filebrowser/filebrowser.sock ]; then chgrp www-data /run/masspanel-filebrowser/filebrowser.sock; chmod 0660 /run/masspanel-filebrowser/filebrowser.sock; exit 0; fi; sleep 1; done; exit 1'
+Restart=on-failure
+RestartSec=3
+RuntimeDirectory=masspanel-filebrowser
+RuntimeDirectoryMode=0755
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home /var/lib/masspanel/filebrowser /run/masspanel-filebrowser
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

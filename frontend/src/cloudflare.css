@@ -1,0 +1,39 @@
+.cloudflare-connection-form > h3 {
+  margin: 20px 0 10px;
+  font-size: 13px;
+}
+
+.cloudflare-connections {
+  margin: 4px 0 20px;
+  border: 1px solid var(--mp-line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cloudflare-connections h3 {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--mp-soft);
+  border-bottom: 1px solid var(--mp-line);
+  font-size: 12px;
+}
+
+.cloudflare-connections article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--mp-line);
+}
+
+.cloudflare-connections article:last-child { border-bottom: 0; }
+.cloudflare-connections span { display: grid; gap: 3px; min-width: 0; }
+.cloudflare-connections b { font-size: 12px; overflow-wrap: anywhere; }
+.cloudflare-connections small { color: var(--mp-muted); font-size: 10px; }
+.cloudflare-connection-form label > small { color: var(--mp-muted); font-weight: 500; }
+
+@media (max-width: 520px) {
+  .cloudflare-connections article { align-items: flex-start; flex-direction: column; }
+  .cloudflare-connections article button { width: 100%; }
+}

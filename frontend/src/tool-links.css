@@ -1,0 +1,35 @@
+.database-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.database-viewer-actions a,
+.explorer-header-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.storage-allocation {
+  min-width: 145px;
+  padding-right: 14px;
+  border-right: 1px solid #d9e1eb;
+  text-align: right;
+}
+
+.storage-allocation span,
+.storage-allocation b {
+  display: block;
+}
+
+.storage-allocation span {
+  color: #718096;
+  font-size: 11px;
+}
+
+.storage-allocation b {
+  margin-top: 3px;
+  font-size: 12px;
+}

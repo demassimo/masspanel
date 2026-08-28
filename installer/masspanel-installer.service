@@ -1,0 +1,17 @@
+[Unit]
+Description=MassPanel single-use web installer
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/etc/masspanel/installation-complete.json
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/masspanel/installer.env
+ExecStart=/usr/bin/python3 /opt/masspanel-installer/stage/installer/masspanel-installer.py
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=false
+
+[Install]
+WantedBy=multi-user.target

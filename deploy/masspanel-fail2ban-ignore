@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+candidate="${1:-}"
+trusted_file=/etc/masspanel/trusted-admin-ip
+test -f "$trusted_file" || exit 1
+trusted="$(tr -d '[:space:]' < "$trusted_file")"
+test -n "$trusted" && test "$candidate" = "$trusted"

@@ -1,0 +1,48 @@
+.app-page-header { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:22px; }
+.app-page-header h1 { margin-bottom:6px; }
+.app-page-header p { margin:0; color:var(--muted); }
+.app-catalog-toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px; margin-bottom:18px; border:1px solid var(--border); border-radius:12px; background:var(--surface); }
+.app-catalog-toolbar .search-box { flex:1; max-width:440px; }
+.app-categories { display:flex; flex-wrap:wrap; gap:6px; }
+.app-category { padding:8px 13px; border:1px solid transparent; border-radius:8px; background:transparent; color:var(--muted); font-weight:650; cursor:pointer; }
+.app-category:hover { background:var(--surface-soft); color:var(--text); }
+.app-category.active { border-color:#c9dcff; background:#eaf2ff; color:#1264d8; }
+.featured-application { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:18px; padding:20px 22px; margin-bottom:18px; border:1px solid #bfd5ff; border-radius:13px; background:#f8fbff; box-shadow:var(--shadow-sm); }
+.featured-application h2 { margin:2px 0 5px; font-size:20px; }
+.featured-application p { margin:0; color:var(--muted); line-height:1.5; }
+.featured-kicker { color:#1769d2; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+.app-logo { width:46px; height:46px; flex:0 0 46px; display:inline-grid; place-items:center; border-radius:11px; background:#e9edf5; color:#667085; font:800 19px/1 system-ui,sans-serif; }
+.app-logo.nextcloud { color:#fff; background:#0082c9; }
+.app-logo.wordpress { color:#fff; background:#21759b; font-family:Georgia,serif; }
+.app-logo.joomla { color:#fff; background:#f38f20; }
+.app-logo.woocommerce { color:#fff; background:#96588a; }
+.app-logo.elementor { color:#fff; background:#92003b; }
+.app-logo.bbpress { color:#fff; background:#195b91; }
+.app-logo.small { width:34px; height:34px; flex-basis:34px; border-radius:8px; font-size:14px; }
+.app-catalog-table { overflow:hidden; margin-bottom:24px; border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:var(--shadow-sm); }
+.app-catalog-head,.app-catalog-row { display:grid; grid-template-columns:minmax(185px,1.05fr) minmax(105px,.5fr) minmax(230px,1.5fr) minmax(170px,.85fr) 100px; gap:16px; align-items:center; }
+.app-catalog-head { padding:11px 18px; border-bottom:1px solid var(--border); background:var(--surface-soft); color:var(--muted); font-size:11px; font-weight:800; letter-spacing:.045em; text-transform:uppercase; }
+.app-catalog-row { min-height:76px; padding:13px 18px; border-bottom:1px solid var(--border); }
+.app-catalog-row:last-child { border-bottom:0; }
+.app-catalog-row:hover { background:#fbfcfe; }
+.app-catalog-row>span { min-width:0; }
+.app-catalog-description,.app-requirements { color:var(--muted); font-size:13px; line-height:1.4; }
+.app-category-badge { display:inline-flex; width:max-content; padding:5px 8px; border-radius:999px; background:#f0f3f7; color:#475467; font-size:11px; font-weight:700; }
+.app-table-name { display:inline-flex; align-items:center; gap:10px; min-width:0; }
+.app-table-name>span:last-child { overflow:hidden; text-overflow:ellipsis; }
+.installed-apps { margin-top:8px; }
+.installed-apps h2 { margin-bottom:4px; }
+.installed-apps>p { margin:0 0 14px; color:var(--muted); }
+.app-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; min-width:270px; }
+.button-link { display:inline-flex; align-items:center; justify-content:center; text-decoration:none; }
+.app-install-note { display:flex; flex-direction:column; gap:4px; padding:13px 14px; margin-bottom:17px; border:1px solid #d7e5ff; border-radius:10px; background:#f5f9ff; color:#24558c; font-size:13px; line-height:1.45; }
+.app-drawer-summary { display:flex; align-items:center; gap:13px; padding:14px; margin-bottom:16px; border:1px solid var(--border); border-radius:11px; background:var(--surface-soft); }
+.app-drawer-summary>span { display:flex; flex-direction:column; gap:3px; }
+.app-drawer-summary small { color:var(--muted); font-size:13px; line-height:1.4; }
+.app-install-facts { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:16px 0; }
+.app-install-facts>div { padding:10px 11px; border:1px solid var(--border); border-radius:9px; background:var(--surface-soft); }
+.app-install-facts span { display:block; margin-bottom:3px; color:var(--muted); font-size:11px; font-weight:700; text-transform:uppercase; }
+.app-install-facts strong { font-size:12px; }
+@media (max-width:1050px) { .app-catalog-table { overflow-x:auto; } .app-catalog-head,.app-catalog-row { min-width:920px; } }
+@media (max-width:760px) { .app-page-header,.app-catalog-toolbar { flex-direction:column; } .app-catalog-toolbar .search-box { width:100%; max-width:none; } .app-categories { width:100%; overflow-x:auto; flex-wrap:nowrap; padding-bottom:2px; } .featured-application { grid-template-columns:auto minmax(0,1fr); padding:17px; } .featured-application>button { grid-column:1/-1; width:100%; } .app-actions { min-width:220px; } }
+@media (max-width:480px) { .app-install-facts { grid-template-columns:1fr; } }

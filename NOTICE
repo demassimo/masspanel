@@ -1,0 +1,24 @@
+MassPanel
+Copyright (C) 2026 MassPanel contributors
+
+MassPanel is distributed under the GNU Affero General Public License,
+version 3 or (at your option) any later version. The complete licence is in
+LICENSE. Commercial use and charging for copies, hosting or support are
+permitted; recipients retain the freedoms granted by the AGPL.
+
+MassPanel is an independent project and is not affiliated with, endorsed by,
+or sponsored by grommunio GmbH, the WordPress Foundation, Meta Platforms,
+the Apache Software Foundation, or the other upstream projects listed in
+THIRD_PARTY.md. Product names are used only to identify compatible upstream
+software. No upstream logo is distributed as MassPanel branding.
+
+MassPanel modifies grommunio Web's
+server/includes/core/class.webappauthentication.php. The modification dated
+2026-08-28 adds administrator-assisted mailbox access and account-suspension
+handling. The preferred source for modification is shipped at
+deploy/runtime-patches/class.webappauthentication.php, alongside the exact
+upstream runtime source archive and installation scripts.
+
+Third-party copyrights remain with their respective owners. Licence texts are
+stored in third_party/licenses and complete source archives are stored in
+third_party/source-archives. See THIRD_PARTY.md and SOURCE_OFFER.md.
