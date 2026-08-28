@@ -1,0 +1,24 @@
+{
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "name": "MassPanel",
+  "description": "Open-source hosting control panel for websites, DNS, databases, applications, email and groupware on Ubuntu 24.04 LTS.",
+  "codeRepository": "https://github.com/demassimo/masspanel",
+  "issueTracker": "https://github.com/demassimo/masspanel/issues",
+  "license": "https://spdx.org/licenses/AGPL-3.0-or-later.html",
+  "programmingLanguage": ["Python", "JavaScript", "Shell", "PHP"],
+  "operatingSystem": "Ubuntu 24.04 LTS",
+  "keywords": [
+    "hosting control panel",
+    "open-source cPanel alternative",
+    "DirectAdmin alternative",
+    "CyberPanel alternative",
+    "Plesk alternative",
+    "Nginx",
+    "DNS",
+    "Gromox",
+    "grommunio Web"
+  ],
+  "developmentStatus": "beta",
+  "version": "2026.08.28.14"
+}

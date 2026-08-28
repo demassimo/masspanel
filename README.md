@@ -1,6 +1,18 @@
-# MassPanel
+# MassPanel — Open-Source Hosting Control Panel
 
-MassPanel is a self-hosted web-hosting control panel for Ubuntu 24.04 LTS. It manages customers, websites, DNS, databases, applications, certificates, backups, mail and groupware from one owner and customer interface.
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![Latest beta](https://img.shields.io/github/v/release/demassimo/masspanel?include_prereleases&label=public%20beta)](https://github.com/demassimo/masspanel/releases)
+[![Ubuntu 24.04 LTS](https://img.shields.io/badge/Ubuntu-24.04_LTS-E95420?logo=ubuntu&logoColor=white)](INSTALL.md)
+[![Live demo](https://img.shields.io/badge/demo-live-0878f9)](https://panel.masscomputing.co.za/)
+
+MassPanel is a free, self-hosted web-hosting control panel for Ubuntu 24.04
+LTS. It is an open-source alternative for people evaluating cPanel,
+DirectAdmin, Plesk, CyberPanel, HestiaCP or ISPConfig. MassPanel manages hosting
+customers, websites, domains, DNS, databases, applications, TLS certificates,
+backups, email and groupware from a single owner and customer portal.
+
+MassPanel is an independent project. It is not affiliated with, endorsed by or
+a drop-in clone of any product named above.
 
 > **Public beta:** MassPanel is not yet recommended for irreplaceable production workloads. Test installation, backup and restore procedures before hosting customer data. Keep an independent off-server backup.
 
@@ -16,9 +28,33 @@ MassPanel is a self-hosted web-hosting control panel for Ubuntu 24.04 LTS. It ma
 - Account packages, resellers, suspension, support tickets and audit activity
 - A separately running, signed, rollback-capable root updater
 
+## Why MassPanel?
+
+- **No mandatory subscription:** self-host the AGPL-licensed source.
+- **Web and groupware together:** website hosting plus Gromox and grommunio Web.
+- **Owner and customer portals:** packages, account limits, support and visible impersonation.
+- **DNS flexibility:** built-in authoritative DNS or optional per-server Cloudflare connections.
+- **Safer operations:** signed updates, rollback checks, firewall controls and audit activity.
+- **Modern application tools:** WordPress management, additional app installers, file management and database browsing.
+
+### Comparing hosting panels
+
+| If you are searching for… | MassPanel approach |
+| --- | --- |
+| Open-source cPanel alternative | AGPL source, customer accounts, websites, DNS, email, databases and backups |
+| DirectAdmin alternative | Owner/customer workflow, packages, domain limits and reseller-oriented management |
+| CyberPanel alternative | Nginx-based hosting, application installation, TLS and firewall tools |
+| Plesk alternative | Unified website, mail, DNS, database and customer administration |
+| HestiaCP or ISPConfig alternative | Ubuntu-focused, self-hosted control plane with a modern React interface |
+
+Feature names describe MassPanel's own capabilities and do not imply exact
+compatibility or feature parity with another product.
+
 ## Install
 
 Use a new Ubuntu 24.04 LTS server with a public static IPv4 address. Read [INSTALL.md](INSTALL.md), prepare DNS and PTR records, extract a versioned release, and run `sudo ./setup.sh`. The command prints a one-time setup URL on port 8080. The port is closed after installation succeeds.
+
+Download the newest signed package from [GitHub Releases](https://github.com/demassimo/masspanel/releases). MassPanel is currently a public beta; begin with a clean test server and maintain independent backups.
 
 ## Public demo
 
@@ -52,3 +88,7 @@ MassPanel is independent and is not an official grommunio product. It deploys a 
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 
 Do not report vulnerabilities in public issues.
+
+## Keywords
+
+`hosting control panel` · `open-source cPanel alternative` · `DirectAdmin alternative` · `CyberPanel alternative` · `Plesk alternative` · `web hosting panel` · `Ubuntu hosting control panel` · `Nginx control panel` · `mail server control panel` · `Gromox` · `grommunio Web`
