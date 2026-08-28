@@ -20,6 +20,20 @@ MassPanel is a self-hosted web-hosting control panel for Ubuntu 24.04 LTS. It ma
 
 Use a new Ubuntu 24.04 LTS server with a public static IPv4 address. Read [INSTALL.md](INSTALL.md), prepare DNS and PTR records, extract a versioned release, and run `sudo ./setup.sh`. The command prints a one-time setup URL on port 8080. The port is closed after installation succeeds.
 
+## Public demo
+
+Try the read-only demonstration at [panel.masscomputing.co.za](https://panel.masscomputing.co.za/).
+
+| View | Username | Password |
+| --- | --- | --- |
+| Server owner | `demo-admin` | `MassPanelDemo!2026` |
+| Hosting customer | `demo-client` | `MassPanelDemo!2026` |
+
+The demo contains only reserved example domains and sample records. Changes,
+uploads, impersonation and email actions are disabled. SMTP is unavailable, so
+the example mailboxes cannot send or receive messages. Do not enter real
+credentials or customer data into the demo.
+
 ## Cloudflare credentials
 
 MassPanel does not ship with a Cloudflare account, token or Account ID. Each server owner optionally adds their own restricted API token in **Domains & DNS**. Connections belong to that MassPanel installation and can be removed by its owner. See [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md).
