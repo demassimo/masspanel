@@ -973,6 +973,33 @@ def _firewall_persist():
     atomic_write_text(Path("/etc/nftables.d/masspanel.nft"), rules, 0o600)
 
 
+def _firewall_policy():
+    policy = {"bantime": 3600, "findtime": 600, "maxretry": 5}
+    path = Path("/etc/fail2ban/jail.d/masspanel-policy.local")
+    if path.is_file():
+        text = path.read_text(encoding="utf-8")
+        for key in policy:
+            match = re.search(rf"(?m)^\s*{key}\s*=\s*(\d+)\s*$", text)
+            if match: policy[key] = int(match.group(1))
+    return policy
+
+
+def firewall_policy(payload):
+    try:
+        values = {key:int(payload.get(key)) for key in ("bantime", "findtime", "maxretry")}
+    except (TypeError, ValueError):
+        fail("Firewall policy values must be numbers.")
+    if not 60 <= values["bantime"] <= 604800: fail("Block time must be between 60 seconds and 7 days.")
+    if not 60 <= values["findtime"] <= 86400: fail("Detection window must be between 60 seconds and 1 day.")
+    if not 1 <= values["maxretry"] <= 20: fail("Failed attempts must be between 1 and 20.")
+    target = Path("/etc/fail2ban/jail.d/masspanel-policy.local")
+    atomic_write_text(target, "[DEFAULT]\n" + "\n".join(f"{key} = {values[key]}" for key in ("bantime", "findtime", "maxretry")) + "\n", 0o644)
+    if Path("/usr/bin/fail2ban-client").exists():
+        result = subprocess.run(["/usr/bin/fail2ban-client", "reload"], capture_output=True, text=True, timeout=30)
+        if result.returncode != 0: fail(result.stderr.strip() or "Fail2ban could not reload the policy.")
+    return {"ok":True, "policy":values}
+
+
 def firewall_status(payload):
     _firewall_ensure()
     trusted_file = Path("/etc/masspanel/trusted-admin-ip")
@@ -995,9 +1022,18 @@ def firewall_status(payload):
             detail = subprocess.run(["/usr/bin/fail2ban-client", "status", jail], capture_output=True, text=True, timeout=15).stdout
             ips = re.search(r"Banned IP list:\s*(.*)", detail)
             jail_ips = ips.group(1).split() if ips else []
-            jails.append({"name":jail, "banned":len(jail_ips)}); banned.extend(jail_ips)
+            jails.append({"name":jail, "banned":len(jail_ips), "ips":jail_ips}); banned.extend(jail_ips)
     return {"engine":"nftables", "active":True, "trusted_ip":trusted, "ignored":_firewall_ignored(), "blocked":_firewall_addresses(4)+_firewall_addresses(6),
-            "listeners":sorted(listeners, key=lambda item:(item["port"],item["protocol"])), "fail2ban_active":bool(jails), "jails":jails, "fail2ban_banned":sorted(set(banned))}
+            "listeners":sorted(listeners, key=lambda item:(item["port"],item["protocol"])), "fail2ban_active":bool(jails), "jails":jails, "fail2ban_banned":sorted(set(banned)), "policy":_firewall_policy()}
+
+
+def firewall_inspect(payload):
+    raw = str(payload.get("ip", "")).strip()
+    try: address = ipaddress.ip_address(raw)
+    except ValueError: fail("Enter a valid IPv4 or IPv6 address.")
+    value = str(address); status = firewall_status({})
+    return {"ip":value, "version":f"IPv{address.version}", "blocked":value in status["blocked"], "ignored":value in status["ignored"],
+            "trusted":value == status["trusted_ip"], "fail2ban_jails":[jail["name"] for jail in status["jails"] if value in jail.get("ips", [])]}
 
 
 def firewall_address(payload, remove=False):
@@ -1455,7 +1491,7 @@ def panel_certificate(payload):
             "location /api/ { proxy_pass http://127.0.0.1:8100; proxy_http_version 1.1; proxy_set_header Host $host; proxy_set_header X-Real-IP $remote_addr; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto https; proxy_read_timeout 600s; }\n"
             "location ^~ /assets/ { try_files $uri =404; expires 1y; add_header Cache-Control \"public, immutable\"; }\n"
             "location = /index.html { add_header Cache-Control \"no-store\"; }\n"
-            "location / { try_files $uri $uri/ /index.html; add_header Cache-Control \"no-store\"; }\n}\n"
+            "location / { try_files $uri $uri.html /index.html; add_header Cache-Control \"no-store\"; }\n}\n"
         )
         atomic_write_text(permanent, final_config)
         if enabled.is_symlink() or enabled.is_file(): enabled.unlink()
@@ -2014,6 +2050,8 @@ def main():
     elif operation == "grommunio_system_mailbox_credentials": result = grommunio_system_mailbox_credentials(payload)
     elif operation == "firewall_trust_admin_ip": result = firewall_trust_admin_ip(payload)
     elif operation == "firewall_status": result = firewall_status(payload)
+    elif operation == "firewall_inspect": result = firewall_inspect(payload)
+    elif operation == "firewall_policy": result = firewall_policy(payload)
     elif operation == "firewall_block": result = firewall_address(payload)
     elif operation == "firewall_unblock": result = firewall_address(payload, True)
     elif operation == "firewall_ignore": result = firewall_ignore(payload)

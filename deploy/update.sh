@@ -47,7 +47,7 @@ install -d -m 0755 -o root -g root /opt/masspanel/frontend/assets
 # upgrade can finish loading their modules; publish the new HTML entrypoint last.
 cp -a "$stage/frontend/dist/assets/." /opt/masspanel/frontend/assets/
 find /opt/masspanel/frontend/assets -type f -mtime +30 -delete
-install -m 0644 -o root -g root "$stage/frontend/dist/index.html" /opt/masspanel/frontend/index.html
+find "$stage/frontend/dist" -maxdepth 1 -type f -name '*.html' -exec install -m 0644 -o root -g root {} /opt/masspanel/frontend/ \;
 chown -R root:root /opt/masspanel/frontend
 install -d -m 0755 -o root -g root /var/www/masspanel-default
 printf '%s\n' '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>MassPanel hosting</title><style>body{font-family:system-ui;background:#101c2e;color:white;display:grid;place-items:center;min-height:100vh;margin:0}main{text-align:center}p{color:#aebbcf}</style></head><body><main><h1>Website hosting is ready</h1><p>Add a domain from MassPanel on port 8443.</p></main></body></html>' > /var/www/masspanel-default/index.html

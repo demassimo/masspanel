@@ -1,53 +1,33 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import {
   api, normalizeSession, DEFAULT_PRODUCT, pagesForSession,
   FatalErrorScreen, Login, Sidebar, Topbar, PageErrorBoundary,
 } from '../legacy.jsx';
 import { navigate, pageFromPath, ROUTES } from './routes.js';
-import DashboardPage from '../pages/DashboardPage.jsx';
-import UsersPage from '../pages/UsersPage.jsx';
-import WebsitesPage from '../pages/WebsitesPage.jsx';
-import WordPressPage from '../pages/WordPressPage.jsx';
-import HostingToolsPage from '../pages/HostingToolsPage.jsx';
-import StorePage from '../pages/StorePage.jsx';
-import FilesPage from '../pages/FilesPage.jsx';
-import DatabasesPage from '../pages/DatabasesPage.jsx';
-import BackupsPage from '../pages/BackupsPage.jsx';
-import DomainsPage from '../pages/DomainsPage.jsx';
-import MailPage from '../pages/MailPage.jsx';
-import MailSecurityPage from '../pages/MailSecurityPage.jsx';
-import FirewallPage from '../pages/FirewallPage.jsx';
-import StoragePage from '../pages/StoragePage.jsx';
-import UpdatesPage from '../pages/UpdatesPage.jsx';
 import '../database-viewer.css';
 import '../tool-links.css';
-import CertificatesPage from '../pages/CertificatesPage.jsx';
-import SupportPage from '../pages/SupportPage.jsx';
-import ActivityPage from '../pages/ActivityPage.jsx';
-import OpenSourcePage from '../pages/OpenSourcePage.jsx';
-import SettingsPage from '../pages/SettingsPage.jsx';
 
 const pages = {
-  overview: DashboardPage,
-  users: UsersPage,
-  websites: WebsitesPage,
-  apps: WordPressPage,
-  tools: HostingToolsPage,
-  store: StorePage,
-  files: FilesPage,
-  databases: DatabasesPage,
-  backups: BackupsPage,
-  dns: DomainsPage,
-  email: MailPage,
-  security: MailSecurityPage,
-  firewall: FirewallPage,
-  storage: StoragePage,
-  updates: UpdatesPage,
-  ssl: CertificatesPage,
-  tickets: SupportPage,
-  audit: ActivityPage,
-  licenses: OpenSourcePage,
-  settings: SettingsPage,
+  overview: lazy(() => import('../pages/DashboardPage.jsx')),
+  users: lazy(() => import('../pages/UsersPage.jsx')),
+  websites: lazy(() => import('../pages/WebsitesPage.jsx')),
+  apps: lazy(() => import('../pages/WordPressPage.jsx')),
+  tools: lazy(() => import('../pages/HostingToolsPage.jsx')),
+  store: lazy(() => import('../pages/StorePage.jsx')),
+  files: lazy(() => import('../pages/FilesPage.jsx')),
+  databases: lazy(() => import('../pages/DatabasesPage.jsx')),
+  backups: lazy(() => import('../pages/BackupsPage.jsx')),
+  dns: lazy(() => import('../pages/DomainsPage.jsx')),
+  email: lazy(() => import('../pages/MailPage.jsx')),
+  security: lazy(() => import('../pages/MailSecurityPage.jsx')),
+  firewall: lazy(() => import('../pages/FirewallPage.jsx')),
+  storage: lazy(() => import('../pages/StoragePage.jsx')),
+  updates: lazy(() => import('../pages/UpdatesPage.jsx')),
+  ssl: lazy(() => import('../pages/CertificatesPage.jsx')),
+  tickets: lazy(() => import('../pages/SupportPage.jsx')),
+  audit: lazy(() => import('../pages/ActivityPage.jsx')),
+  licenses: lazy(() => import('../pages/OpenSourcePage.jsx')),
+  settings: lazy(() => import('../pages/SettingsPage.jsx')),
 };
 
 export default function App() {
@@ -124,8 +104,8 @@ export default function App() {
       <Sidebar session={session} page={safePage} setPage={setPage} onLogout={logout} onStopImpersonation={stopImpersonation} product={product} />
       <main className="content">
         <Topbar session={session} page={safePage} setPage={setPage} onLogout={logout} />
-        <PageErrorBoundary resetKey={safePage} onRecover={() => setPage('overview')}>
-          <Page {...pageProps} />
+        <PageErrorBoundary resetKey={safePage} onRecover={() => window.location.assign(ROUTES.overview)}>
+          <Suspense fallback={<div className="loading">Loading {safePage}…</div>}><Page {...pageProps} /></Suspense>
         </PageErrorBoundary>
       </main>
     </div>

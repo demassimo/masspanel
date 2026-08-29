@@ -1442,6 +1442,29 @@ def get_firewall():
     except RuntimeError as exc: return jsonify(error=str(exc)), 400
 
 
+@app.get("/api/firewall/ip/<path:ip>")
+@require_auth
+@require_admin
+def inspect_firewall_address(ip):
+    try: result = helper({"operation":"firewall_inspect", "ip":ip})
+    except RuntimeError as exc: return jsonify(error=str(exc)), 400
+    with db() as c:
+        history = c.execute("SELECT id,created_at,actor,action,outcome FROM audit WHERE target=? AND action LIKE 'firewall.%' ORDER BY id DESC LIMIT 20", (result["ip"],)).fetchall()
+    return jsonify(**result, history=[dict(row) for row in history])
+
+
+@app.put("/api/firewall/policy")
+@require_auth
+@require_admin
+@require_csrf
+def update_firewall_policy():
+    payload = request.get_json(silent=True) or {}
+    try: result = helper({"operation":"firewall_policy", **payload})
+    except RuntimeError as exc: return jsonify(error=str(exc)), 400
+    audit("firewall.policy", f"maxretry:{payload.get('maxretry')}")
+    return jsonify(**result)
+
+
 @app.post("/api/firewall/block")
 @require_auth
 @require_admin

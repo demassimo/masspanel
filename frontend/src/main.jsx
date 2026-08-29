@@ -13,7 +13,6 @@ import './workspace.css';
 import './store-code.css';
 import './drawer-scroll.css';
 import './mail-security.css';
-import './firewall.css';
 import './storage.css';
 
 const root = document.getElementById('root');

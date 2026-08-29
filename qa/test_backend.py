@@ -61,6 +61,9 @@ class BackendFeatureTests(unittest.TestCase):
             if payload["operation"] == "list": return {"users": []}
             if payload["operation"] == "service_list": return {"services":[{"name":"nginx","state":"active","sub_state":"running","enabled":True,"critical":True}]}
             if payload["operation"] == "service_action": return {"service":payload["service"],"action":payload["action"],"scheduled":False}
+            if payload["operation"] == "firewall_status": return {"engine":"nftables","active":True,"blocked":["203.0.113.9"],"ignored":[],"listeners":[],"jails":[{"name":"sshd","banned":1,"ips":["203.0.113.10"]}],"fail2ban_banned":["203.0.113.10"],"policy":{"bantime":3600,"findtime":600,"maxretry":5}}
+            if payload["operation"] == "firewall_inspect": return {"ip":payload["ip"],"version":"IPv4","blocked":payload["ip"]=="203.0.113.9","ignored":False,"trusted":False,"fail2ban_jails":[]}
+            if payload["operation"] == "firewall_policy": return {"ok":True,"policy":{"bantime":payload["bantime"],"findtime":payload["findtime"],"maxretry":payload["maxretry"]}}
             if payload["operation"] == "wordpress_install":
                 return {"version": "6.8.2", "admin_user": payload["admin_user"], "db_name": "mp_test", "db_user": "mpu_test", "ssl_mode": "self"}
             if payload["operation"] == "wordpress_action": return {"version": "6.8.2"}
@@ -359,6 +362,18 @@ class BackendFeatureTests(unittest.TestCase):
         self.assertEqual(toggled.status_code, 200)
         deleted = self.client.delete(f"/api/backup-schedules/{schedule_id}", headers={"X-CSRF-Token":"token"})
         self.assertEqual(deleted.status_code, 200)
+
+    def test_firewall_ip_inspection_and_policy(self):
+        self.login_as("admin", "admin")
+        status = self.client.get("/api/firewall")
+        self.assertEqual(status.status_code, 200)
+        self.assertEqual(status.get_json()["policy"]["maxretry"], 5)
+        inspected = self.client.get("/api/firewall/ip/203.0.113.9")
+        self.assertEqual(inspected.status_code, 200)
+        self.assertTrue(inspected.get_json()["blocked"])
+        changed = self.client.put("/api/firewall/policy", json={"bantime":7200,"findtime":900,"maxretry":4}, headers={"X-CSRF-Token":"token"})
+        self.assertEqual(changed.status_code, 200)
+        self.assertEqual(changed.get_json()["policy"]["bantime"], 7200)
 
     def test_forwarding_accepts_normal_addresses_and_rejects_unsafe_input(self):
         self.login_as("alice", "client", "alice")

@@ -28,6 +28,6 @@ export const pageFromPath = (pathname) => {
 
 export function navigate(page, replace = false) {
   const path = ROUTES[page] || ROUTES.overview;
-  window.history[replace ? 'replaceState' : 'pushState']({ page }, '', path);
-  window.dispatchEvent(new PopStateEvent('popstate'));
+  if (window.location.pathname === path) return;
+  window.location[replace ? 'replace' : 'assign'](path);
 }
