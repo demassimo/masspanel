@@ -3,7 +3,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Latest beta](https://img.shields.io/github/v/release/demassimo/masspanel?include_prereleases&label=public%20beta)](https://github.com/demassimo/masspanel/releases)
 [![Ubuntu 24.04 LTS](https://img.shields.io/badge/Ubuntu-24.04_LTS-E95420?logo=ubuntu&logoColor=white)](INSTALL.md)
-[![Live demo](https://img.shields.io/badge/demo-live-0878f9)](https://panel.masscomputing.co.za/)
+[![Live demo](https://img.shields.io/badge/demo-live-0878f9)](https://demo.masscomputing.co.za/)
 
 MassPanel is a free, self-hosted web-hosting control panel for Ubuntu 24.04
 LTS. It is an open-source alternative for people evaluating cPanel,
@@ -58,7 +58,7 @@ Download the newest signed package from [GitHub Releases](https://github.com/dem
 
 ## Public demo
 
-Try the read-only demonstration at [panel.masscomputing.co.za](https://panel.masscomputing.co.za/).
+Try the read-only demonstration at [demo.masscomputing.co.za](https://demo.masscomputing.co.za/).
 
 | View | Username | Password |
 | --- | --- | --- |
