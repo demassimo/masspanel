@@ -779,7 +779,9 @@ def grommunio_system_mailbox_configure(payload):
     if re.search(r"(?m)^root\s*:", alias_text): alias_text = re.sub(r"(?m)^root\s*:.*$", root_line, alias_text)
     else: alias_text = alias_text.rstrip() + "\n" + root_line + "\n"
     atomic_write_text(aliases, alias_text, 0o644)
-    if Path("/usr/sbin/newaliases").exists(): run(["/usr/sbin/newaliases"], timeout=30)
+    newaliases = next((path for path in ("/usr/bin/newaliases", "/usr/sbin/newaliases") if Path(path).exists()), "")
+    if newaliases:
+        run([newaliases], timeout=30)
     if Path("/etc/systemd/system/masspanel-system-mail-sorter.timer").exists():
         run(["/usr/bin/systemctl", "daemon-reload"], timeout=30)
         run(["/usr/bin/systemctl", "enable", "--now", "masspanel-system-mail-sorter.timer"], timeout=30)
