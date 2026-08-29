@@ -6,6 +6,7 @@ import './styles.css';
 import './roles.css';
 import './design.css';
 import './hosting.css';
+import './backup.css';
 import './apps.css';
 import './panel-v2.css';
 import './workspace.css';

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 test "${EUID}" -eq 0
+
+if ! command -v rclone >/dev/null 2>&1 || ! command -v cron >/dev/null 2>&1; then
+    DEBIAN_FRONTEND=noninteractive apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cron rclone
+fi
 stage=${MASSPANEL_UPDATE_STAGE:-/tmp/masspanel-update}
 test -f "$stage/backend/app.py"
 test -f "$stage/backend/license_public.pem"
@@ -11,6 +16,7 @@ if test -f "$stage/deploy/write-runtime-lock.py"; then
 fi
 install -m 0640 -o root -g masspanel "$stage/backend/app.py" /opt/masspanel/backend/app.py
 install -m 0640 -o root -g masspanel "$stage/backend/helper.py" /opt/masspanel/backend/helper.py
+install -m 0750 -o root -g masspanel "$stage/backend/scheduled_backup.py" /opt/masspanel/backend/scheduled_backup.py
 install -m 0644 -o root -g masspanel "$stage/backend/license_public.pem" /opt/masspanel/backend/license_public.pem
 install -m 0640 -o root -g masspanel "$stage/backend/requirements.txt" /opt/masspanel/backend/requirements.txt
 install -m 0755 -o root -g root "$stage/backend/helper.py" /usr/local/libexec/masspanel-helper
@@ -69,7 +75,7 @@ done
 find "$stage/third_party/source-archives" -maxdepth 1 -type f ! -name 'gromox-container-0.0.4.tar.gz' -exec install -m 0644 -o root -g root {} /usr/share/masspanel/source/ \;
 tar --exclude='./third_party/source-archives/gromox-container-0.0.4.tar.gz' -czf /usr/share/masspanel/source/masspanel-corresponding-source.tar.gz -C "$stage" .
 chmod 0644 /usr/share/masspanel/source/masspanel-corresponding-source.tar.gz
-/opt/masspanel/venv/bin/python -m py_compile /opt/masspanel/backend/app.py /opt/masspanel/backend/helper.py
+/opt/masspanel/venv/bin/python -m py_compile /opt/masspanel/backend/app.py /opt/masspanel/backend/helper.py /opt/masspanel/backend/scheduled_backup.py
 nginx -t
 systemctl restart masspanel
 systemctl reload nginx

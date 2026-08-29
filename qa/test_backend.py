@@ -31,7 +31,7 @@ class BackendFeatureTests(unittest.TestCase):
     def setUp(self):
         panel.attempts.clear()
         with panel.db() as c:
-            for table in ("wordpress_impersonation_tokens", "mail_impersonation_tokens", "ticket_replies", "support_tickets", "store_orders", "store_products", "account_suspension_domains", "app_installations", "backups", "email_accounts", "dns_records", "user_databases", "website_redirects", "mail_domains", "domains", "account_feature_overrides", "accounts", "package_features", "hosting_packages", "audit"):
+            for table in ("wordpress_impersonation_tokens", "mail_impersonation_tokens", "ticket_replies", "support_tickets", "store_orders", "store_products", "account_suspension_domains", "app_installations", "backups", "backup_schedules", "email_accounts", "dns_records", "user_databases", "website_redirects", "mail_domains", "domains", "account_feature_overrides", "accounts", "package_features", "hosting_packages", "audit"):
                 c.execute(f"DELETE FROM {table}")
             stamp = panel.now()
             for username, role, system in (("admin", "admin", None), ("alice", "client", "alice"), ("bob", "client", "bob")):
@@ -59,6 +59,8 @@ class BackendFeatureTests(unittest.TestCase):
         def fake_helper(payload):
             self.helper_calls.append(payload)
             if payload["operation"] == "list": return {"users": []}
+            if payload["operation"] == "service_list": return {"services":[{"name":"nginx","state":"active","sub_state":"running","enabled":True,"critical":True}]}
+            if payload["operation"] == "service_action": return {"service":payload["service"],"action":payload["action"],"scheduled":False}
             if payload["operation"] == "wordpress_install":
                 return {"version": "6.8.2", "admin_user": payload["admin_user"], "db_name": "mp_test", "db_user": "mpu_test", "ssl_mode": "self"}
             if payload["operation"] == "wordpress_action": return {"version": "6.8.2"}
@@ -322,6 +324,41 @@ class BackendFeatureTests(unittest.TestCase):
         response = self.client.get(f"/api/backups/{backup.get_json()['id']}/download", buffered=True)
         self.assertEqual(response.status_code, 200)
         response.close()
+
+    def test_service_controls_and_backup_schedules(self):
+        self.login_as("admin", "admin")
+        services = self.client.get("/api/tools/services")
+        self.assertEqual(services.status_code, 200)
+        self.assertEqual(services.get_json()["services"][0]["name"], "nginx")
+        restart = self.client.post("/api/tools/services/nginx/restart", headers={"X-CSRF-Token":"token"})
+        self.assertEqual(restart.status_code, 200)
+
+        created = self.client.post("/api/backup-schedules", json={
+            "domain":"alice.example.com", "frequency":"weekly", "hour":3, "minute":15,
+            "weekday":2, "monthday":1, "retention":2, "destination_type":"sftp",
+            "remote_path":"MassPanel/nightly", "destination_config":{"host":"backup.example.com","port":22,"username":"alice","password":"Secret123!"},
+        }, headers={"X-CSRF-Token":"token"})
+        self.assertEqual(created.status_code, 201)
+        schedule_id = created.get_json()["id"]
+        listed = self.client.get("/api/backup-schedules").get_json()["schedules"]
+        self.assertEqual(len(listed), 1)
+        self.assertEqual(listed[0]["frequency"], "weekly")
+        self.assertEqual(listed[0]["destination_type"], "sftp")
+        self.assertNotIn("destination_config", listed[0])
+        uploaded = []
+        original_rclone = panel._rclone_backup
+        panel._rclone_backup = lambda row, filename: uploaded.append((row["destination_type"], filename))
+        try:
+            run = self.client.post(f"/api/backup-schedules/{schedule_id}/run", headers={"X-CSRF-Token":"token"})
+        finally:
+            panel._rclone_backup = original_rclone
+        self.assertEqual(run.status_code, 200)
+        self.assertEqual(uploaded[0][0], "sftp")
+        self.assertTrue(Path(self.client.get("/api/backups").get_json()["backups"][0]["filename"]).is_file())
+        toggled = self.client.post(f"/api/backup-schedules/{schedule_id}/toggle", headers={"X-CSRF-Token":"token"})
+        self.assertEqual(toggled.status_code, 200)
+        deleted = self.client.delete(f"/api/backup-schedules/{schedule_id}", headers={"X-CSRF-Token":"token"})
+        self.assertEqual(deleted.status_code, 200)
 
     def test_forwarding_accepts_normal_addresses_and_rejects_unsafe_input(self):
         self.login_as("alice", "client", "alice")

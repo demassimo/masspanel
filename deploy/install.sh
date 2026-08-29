@@ -25,7 +25,7 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends nginx python3-venv python3-pip openssl sudo ca-certificates
+apt-get install -y --no-install-recommends nginx python3-venv python3-pip openssl sudo ca-certificates cron rclone
 
 if ! id masspanel >/dev/null 2>&1; then
   useradd --system --home-dir /var/lib/masspanel --create-home --shell /usr/sbin/nologin masspanel
@@ -59,6 +59,7 @@ tar --exclude='./third_party/source-archives/gromox-container-0.0.4.tar.gz' -czf
 chmod 0644 /usr/share/masspanel/source/masspanel-corresponding-source.tar.gz
 
 install -m 0755 -o root -g root /opt/masspanel/backend/helper.py /usr/local/libexec/masspanel-helper
+install -m 0750 -o root -g masspanel "${STAGE_DIR}/backend/scheduled_backup.py" /opt/masspanel/backend/scheduled_backup.py
 install -m 0755 -o root -g root "${STAGE_DIR}/deploy/system-mail-sorter.py" /usr/local/libexec/masspanel-system-mail-sorter
 install -m 0644 -o root -g root "${STAGE_DIR}/deploy/masspanel-system-mail-sorter.service" /etc/systemd/system/masspanel-system-mail-sorter.service
 install -m 0644 -o root -g root "${STAGE_DIR}/deploy/masspanel-system-mail-sorter.timer" /etc/systemd/system/masspanel-system-mail-sorter.timer

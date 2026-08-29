@@ -97,7 +97,7 @@ def restore(snapshot):
     run(["/usr/bin/tar","--acls","--xattrs","--numeric-owner","-xzf",str(snapshot),"-C","/"],timeout=1800)
     run(["/usr/bin/systemctl","daemon-reload"]); run(["/usr/sbin/nginx","-t"]); run(["/usr/bin/systemctl","restart","masspanel","nginx"])
 def healthcheck():
-    run(["/opt/masspanel/venv/bin/python","-m","py_compile","/opt/masspanel/backend/app.py","/usr/local/libexec/masspanel-helper"])
+    run(["/opt/masspanel/venv/bin/python","-m","py_compile","/opt/masspanel/backend/app.py","/usr/local/libexec/masspanel-helper","/opt/masspanel/backend/scheduled_backup.py"])
     run(["/usr/sbin/nginx","-t"]); run(["/usr/bin/systemctl","is-active","--quiet","masspanel","nginx"])
     run(["/usr/bin/curl","--fail","--silent","--show-error","--max-time","15","http://127.0.0.1:8100/api/live"])
     if not Path("/opt/masspanel/frontend/index.html").is_file(): raise RuntimeError("Frontend entrypoint is missing.")

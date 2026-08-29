@@ -29,6 +29,29 @@ CLOUDFLARE_CONNECTIONS = Path("/etc/masspanel/cloudflare-connections.json")
 CLOUDFLARE_LEGACY_TOKEN = Path("/etc/masspanel/cloudflare-token")
 GROMMUNIO_SSO_CREDENTIALS = Path("/etc/masspanel/grommunio-impersonation.json")
 SYSTEM_MAILBOX_CREDENTIALS = Path("/etc/masspanel/system-mailbox.json")
+MANAGED_SERVICES = {
+    "nginx": ("Web server", True),
+    "masspanel": ("MassPanel API", True),
+    "php8.3-fpm": ("PHP application runtime", False),
+    "mariadb": ("MariaDB database", False),
+    "bind9": ("Authoritative DNS", False),
+    "postfix": ("SMTP transport", False),
+    "rspamd": ("Spam filtering", False),
+    "gromox-http": ("Grommunio web and EWS", False),
+    "gromox-imap": ("IMAP mailbox access", False),
+    "gromox-pop3": ("POP3 mailbox access", False),
+    "gromox-delivery": ("Mail delivery", False),
+    "gromox-delivery-queue": ("Mail delivery queue", False),
+    "gromox-zcore": ("Gromox store service", False),
+    "gromox-midb": ("Gromox mailbox database", False),
+    "gromox-event": ("Gromox events", False),
+    "gromox-timer": ("Gromox timers", False),
+    "redis-server@grommunio": ("Grommunio cache", False),
+    "fail2ban": ("Brute-force protection", False),
+    "cron": ("Scheduled jobs", False),
+    "masspanel-system-mail-sorter.timer": ("System mailbox sorting", False),
+    "masspanel-updater.timer": ("Update checks", False),
+}
 
 
 def valid_email_address(value):
@@ -419,6 +442,75 @@ def cron_sync(payload):
     else:
         path.unlink(missing_ok=True)
     return {"owner": owner, "task_count": len(tasks), "path": str(path)}
+
+
+def backup_schedule_sync(payload):
+    schedules = payload.get("schedules", [])
+    if not isinstance(schedules, list) or len(schedules) > 1000:
+        fail("Invalid backup schedule set.")
+    lines = ["SHELL=/bin/bash", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"]
+    for item in schedules:
+        schedule_id = str(item.get("id", ""))
+        cron = str(item.get("cron", "")).strip()
+        if not re.fullmatch(r"[a-f0-9]{16}", schedule_id):
+            fail("Invalid backup schedule identifier.")
+        fields = cron.split()
+        if len(fields) != 5 or any(not re.fullmatch(r"[0-9*/?,\-]+", field) for field in fields):
+            fail("Invalid backup schedule.")
+        lines.append(
+            f"{cron} masspanel set -a; . /etc/masspanel/masspanel.env; set +a; "
+            f"/opt/masspanel/venv/bin/python /opt/masspanel/backend/scheduled_backup.py {schedule_id} "
+            f">> /var/log/masspanel-backups.log 2>&1"
+        )
+    path = Path("/etc/cron.d/masspanel-backups")
+    if schedules:
+        atomic_write_text(path, "\n".join(lines) + "\n", 0o600)
+    else:
+        path.unlink(missing_ok=True)
+    return {"schedule_count": len(schedules), "path": str(path)}
+
+
+def service_list():
+    services = []
+    for unit, (description, critical) in MANAGED_SERVICES.items():
+        loaded = subprocess.run(["/usr/bin/systemctl", "show", unit, "--property=LoadState", "--value"], capture_output=True, text=True, timeout=8, check=False).stdout.strip()
+        if loaded in {"", "not-found"}:
+            continue
+        details = subprocess.run(
+            ["/usr/bin/systemctl", "show", unit, "--property=ActiveState,SubState,UnitFileState,Description"],
+            capture_output=True, text=True, timeout=8, check=False,
+        )
+        values = {}
+        for line in details.stdout.splitlines():
+            key, separator, value = line.partition("=")
+            if separator:
+                values[key] = value
+        services.append({
+            "name": unit,
+            "label": values.get("Description") or description,
+            "description": description,
+            "state": values.get("ActiveState") or "unknown",
+            "sub_state": values.get("SubState") or "unknown",
+            "enabled": values.get("UnitFileState") in {"enabled", "enabled-runtime", "static", "indirect", "generated"},
+            "critical": critical,
+        })
+    return {"services": services}
+
+
+def service_action(payload):
+    unit = str(payload.get("service", ""))
+    action = str(payload.get("action", ""))
+    if unit not in MANAGED_SERVICES or action not in {"start", "stop", "restart"}:
+        fail("Unsupported service action.")
+    if MANAGED_SERVICES[unit][1] and action == "stop":
+        fail("This service keeps the panel reachable and cannot be stopped from the web interface.")
+    if action == "restart" and unit in {"masspanel", "nginx"}:
+        run(["/usr/bin/systemd-run", "--unit", f"masspanel-service-{unit.replace('.', '-')}--{int(time.time())}", "--on-active=2s", "/usr/bin/systemctl", "restart", unit], timeout=20)
+        return {"service": unit, "action": action, "scheduled": True}
+    result = subprocess.run(["/usr/bin/systemctl", action, unit], capture_output=True, text=True, timeout=90, check=False)
+    if result.returncode:
+        fail((result.stderr or result.stdout or "Service action failed.").strip())
+    return {"service": unit, "action": action, "scheduled": False}
 
 
 def cron_run(payload):
@@ -1950,6 +2042,9 @@ def main():
     elif operation == "application_action": result = application_action(payload)
     elif operation == "cron_sync": result = cron_sync(payload)
     elif operation == "cron_run": result = cron_run(payload)
+    elif operation == "backup_schedule_sync": result = backup_schedule_sync(payload)
+    elif operation == "service_list": result = service_list()
+    elif operation == "service_action": result = service_action(payload)
     elif operation == "php_config": result = php_config(payload)
     elif operation == "website_logs": result = website_logs(payload)
     elif operation == "website_rules_sync": result = website_rules_sync(payload)

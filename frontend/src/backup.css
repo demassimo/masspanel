@@ -1,0 +1,16 @@
+.backup-schedule-form textarea {
+  min-height: 76px;
+  resize: vertical;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 9px 11px;
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.backup-token-field {
+  grid-column: span 2;
+}
+
+@media (max-width: 650px) {
+  .backup-token-field { grid-column: auto; }
+}

@@ -7,6 +7,9 @@ import json
 import os
 import re
 import secrets
+import configparser
+import tempfile
+import shutil
 import socket
 import ssl
 import sqlite3
@@ -28,6 +31,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
+from cryptography.fernet import Fernet, InvalidToken
 from flask import Flask, jsonify, request, session, send_file, Response, make_response, redirect
 from werkzeug.middleware.proxy_fix import ProxyFix
 from jinja2 import BaseLoader, StrictUndefined, TemplateError, select_autoescape
@@ -311,6 +315,28 @@ def _ensure_table(conn):
               FOREIGN KEY(domain) REFERENCES domains(domain) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS backup_schedules(
+              id TEXT PRIMARY KEY,
+              owner TEXT NOT NULL,
+              domain TEXT NOT NULL,
+              frequency TEXT NOT NULL CHECK(frequency IN ('daily','weekly','monthly')),
+              hour INTEGER NOT NULL CHECK(hour BETWEEN 0 AND 23),
+              minute INTEGER NOT NULL CHECK(minute BETWEEN 0 AND 59),
+              weekday INTEGER NOT NULL DEFAULT 0 CHECK(weekday BETWEEN 0 AND 6),
+              monthday INTEGER NOT NULL DEFAULT 1 CHECK(monthday BETWEEN 1 AND 28),
+              retention INTEGER NOT NULL DEFAULT 3 CHECK(retention BETWEEN 1 AND 30),
+              destination_type TEXT NOT NULL DEFAULT 'local',
+              destination_config TEXT NOT NULL DEFAULT '',
+              remote_path TEXT NOT NULL DEFAULT 'MassPanel',
+              enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)),
+              last_run_at TEXT NOT NULL DEFAULT '',
+              last_status TEXT NOT NULL DEFAULT 'never',
+              last_error TEXT NOT NULL DEFAULT '',
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              FOREIGN KEY(domain) REFERENCES domains(domain) ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS website_redirects(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               domain TEXT NOT NULL,
@@ -534,6 +560,8 @@ def _ensure_table(conn):
             conn.execute("ALTER TABLE mail_domains ADD COLUMN grommunio_managed INTEGER NOT NULL DEFAULT 0")
         if not _table_has_col(conn, "store_settings", "custom_js"):
             conn.execute("ALTER TABLE store_settings ADD COLUMN custom_js TEXT NOT NULL DEFAULT ''")
+        if not _table_has_col(conn, "backups", "schedule_id"):
+            conn.execute("ALTER TABLE backups ADD COLUMN schedule_id TEXT")
 
         conn.execute(
             "INSERT OR IGNORE INTO mail_domains(domain,zone_domain,owner,status,created_at,created_by) "
@@ -543,6 +571,11 @@ def _ensure_table(conn):
         conn.execute("CREATE INDEX IF NOT EXISTS idx_dns_records_mail_domain ON dns_records(mail_domain,domain)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_email_accounts_mail_domain ON email_accounts(mail_domain,domain)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_owner ON scheduled_tasks(owner,domain)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_backup_schedules_owner ON backup_schedules(owner,domain)")
+        for column, definition in (("destination_type", "TEXT NOT NULL DEFAULT 'local'"), ("destination_config", "TEXT NOT NULL DEFAULT ''"), ("remote_path", "TEXT NOT NULL DEFAULT 'MassPanel'")):
+            if column not in {item[1] for item in conn.execute("PRAGMA table_info(backup_schedules)").fetchall()}:
+                conn.execute(f"ALTER TABLE backup_schedules ADD COLUMN {column} {definition}")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_backups_schedule ON backups(schedule_id,id DESC)")
         conn.execute("UPDATE domains SET php_enabled=1 WHERE domain IN (SELECT domain FROM app_installations)")
 
         conn.execute(
@@ -4018,6 +4051,202 @@ def hosting_tools_overview():
     })
 
 
+@app.get("/api/tools/services")
+@require_auth
+@require_admin
+def managed_services():
+    try:
+        return jsonify(**helper({"operation":"service_list"}))
+    except RuntimeError as exc:
+        return jsonify(error=str(exc)), 400
+
+
+@app.post("/api/tools/services/<path:service>/<action>")
+@require_auth
+@require_admin
+@require_csrf
+def manage_service(service, action):
+    if action not in {"start", "stop", "restart"}:
+        return jsonify(error="Unsupported service action."), 400
+    try:
+        result = helper({"operation":"service_action", "service":service, "action":action})
+        audit(f"service.{action}", service)
+        return jsonify(**result)
+    except RuntimeError as exc:
+        audit(f"service.{action}", service, "failed")
+        return jsonify(error=str(exc)), 400
+
+
+def _backup_schedule_cron(row):
+    minute, hour = int(row["minute"]), int(row["hour"])
+    if row["frequency"] == "daily":
+        return f"{minute} {hour} * * *"
+    if row["frequency"] == "weekly":
+        return f"{minute} {hour} * * {int(row['weekday'])}"
+    return f"{minute} {hour} {int(row['monthday'])} * *"
+
+
+def _backup_secret_box():
+    key = base64.urlsafe_b64encode(hashlib.sha256(app.secret_key.encode("utf-8")).digest())
+    return Fernet(key)
+
+
+def _encrypt_backup_destination(config):
+    if not config:
+        return ""
+    return _backup_secret_box().encrypt(json.dumps(config).encode("utf-8")).decode("ascii")
+
+
+def _decrypt_backup_destination(value):
+    if not value:
+        return {}
+    try:
+        return json.loads(_backup_secret_box().decrypt(value.encode("ascii")).decode("utf-8"))
+    except (InvalidToken, ValueError, json.JSONDecodeError):
+        raise RuntimeError("The backup destination credentials cannot be decrypted.")
+
+
+def _public_backup_schedule(row):
+    item = dict(row)
+    item.pop("destination_config", None)
+    item["destination_configured"] = item.get("destination_type", "local") == "local" or bool(row["destination_config"])
+    return item
+
+
+def _validate_backup_destination(payload):
+    kind = str(payload.get("destination_type", "local")).lower().strip()
+    if kind not in {"local", "ftp", "sftp", "google_drive"}:
+        raise ValueError("Choose local storage, FTP, SFTP or Google Drive.")
+    remote_path = str(payload.get("remote_path", "MassPanel")).strip().strip("/") or "MassPanel"
+    if ".." in remote_path.split("/") or len(remote_path) > 240:
+        raise ValueError("Choose a valid remote backup folder.")
+    if kind == "local":
+        return kind, {}, remote_path
+    config = payload.get("destination_config") or {}
+    if not isinstance(config, dict):
+        raise ValueError("Backup destination settings are invalid.")
+    if kind in {"ftp", "sftp"}:
+        required = ("host", "username", "password")
+        if any(not str(config.get(field, "")).strip() for field in required):
+            raise ValueError(f"{kind.upper()} host, username and password are required.")
+        port = int(config.get("port") or (21 if kind == "ftp" else 22))
+        if not 1 <= port <= 65535:
+            raise ValueError("The remote port is invalid.")
+        config = {"host":str(config["host"]).strip(), "port":port, "username":str(config["username"]).strip(), "password":str(config["password"])}
+    else:
+        token = config.get("token")
+        if isinstance(token, str):
+            try: token = json.loads(token)
+            except json.JSONDecodeError as exc: raise ValueError("Paste a valid Google Drive OAuth token JSON object.") from exc
+        if not isinstance(token, dict) or not token.get("access_token"):
+            raise ValueError("A Google Drive OAuth token is required.")
+        config = {"token":token, "client_id":str(config.get("client_id", "")).strip(), "client_secret":str(config.get("client_secret", "")).strip()}
+    return kind, config, remote_path
+
+
+def _sync_backup_schedules(c):
+    rows = c.execute("SELECT id,frequency,hour,minute,weekday,monthday FROM backup_schedules WHERE enabled=1 ORDER BY id").fetchall()
+    return helper({"operation":"backup_schedule_sync", "schedules":[{"id":row["id"], "cron":_backup_schedule_cron(row)} for row in rows]})
+
+
+@app.get("/api/backup-schedules")
+@require_auth
+def list_backup_schedules():
+    with db() as c:
+        if session["role"] == "admin":
+            rows = c.execute("SELECT * FROM backup_schedules ORDER BY domain,created_at").fetchall()
+        else:
+            rows = c.execute("SELECT * FROM backup_schedules WHERE owner=? ORDER BY domain,created_at", (session.get("system_username"),)).fetchall()
+    return jsonify(schedules=[_public_backup_schedule(row) for row in rows])
+
+
+@app.post("/api/backup-schedules")
+@require_auth
+@require_csrf
+def create_backup_schedule():
+    payload = request.get_json(silent=True) or {}
+    domain = str(payload.get("domain", "")).lower().strip().strip(".")
+    frequency = str(payload.get("frequency", "daily")).lower().strip()
+    try:
+        hour = int(payload.get("hour", 2)); minute = int(payload.get("minute", 0))
+        weekday = int(payload.get("weekday", 0)); monthday = int(payload.get("monthday", 1)); retention = int(payload.get("retention", 3))
+        destination_type, destination_config, remote_path = _validate_backup_destination(payload)
+    except (TypeError, ValueError) as exc:
+        return jsonify(error=str(exc) or "Backup schedule values are invalid."), 400
+    if frequency not in {"daily", "weekly", "monthly"} or not 0 <= hour <= 23 or not 0 <= minute <= 59 or not 0 <= weekday <= 6 or not 1 <= monthday <= 28 or not 1 <= retention <= 30:
+        return jsonify(error="Choose a valid daily, weekly or monthly backup schedule."), 400
+    with db() as c:
+        context = _domain_context(c, domain, session.get("system_username"))
+        if not context:
+            return jsonify(error="Domain not found or access denied."), 403
+        if c.execute("SELECT 1 FROM backup_schedules WHERE domain=?", (domain,)).fetchone():
+            return jsonify(error="This website already has a backup schedule."), 409
+        package_limit = _package_limit(c, context["owner"], "backup_limit")
+        if package_limit is not None and retention > package_limit:
+            return jsonify(error=f"This package can keep at most {package_limit} backups."), 409
+        schedule_id = secrets.token_hex(8)
+        try:
+            c.execute("INSERT INTO backup_schedules(id,owner,domain,frequency,hour,minute,weekday,monthday,retention,destination_type,destination_config,remote_path,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
+                      (schedule_id,context["owner"],domain,frequency,hour,minute,weekday,monthday,retention,destination_type,_encrypt_backup_destination(destination_config),remote_path,now(),now()))
+            _sync_backup_schedules(c)
+        except RuntimeError as exc:
+            return jsonify(error=str(exc)), 400
+    audit("backup.schedule.create", domain)
+    return jsonify(ok=True,id=schedule_id), 201
+
+
+@app.post("/api/backup-schedules/<schedule_id>/toggle")
+@require_auth
+@require_csrf
+def toggle_backup_schedule(schedule_id):
+    with db() as c:
+        row = c.execute("SELECT * FROM backup_schedules WHERE id=?", (schedule_id,)).fetchone()
+        if not row or (session["role"] != "admin" and row["owner"] != session.get("system_username")):
+            return jsonify(error="Backup schedule not found."), 404
+        enabled = 0 if row["enabled"] else 1
+        try:
+            c.execute("UPDATE backup_schedules SET enabled=?,updated_at=? WHERE id=?", (enabled,now(),schedule_id))
+            _sync_backup_schedules(c)
+        except RuntimeError as exc:
+            return jsonify(error=str(exc)), 400
+    audit("backup.schedule.toggle", row["domain"])
+    return jsonify(ok=True,enabled=bool(enabled))
+
+
+@app.post("/api/backup-schedules/<schedule_id>/run")
+@require_auth
+@require_csrf
+def run_backup_schedule_now(schedule_id):
+    with db() as c:
+        row = c.execute("SELECT * FROM backup_schedules WHERE id=?", (schedule_id,)).fetchone()
+    if not row or (session["role"] != "admin" and row["owner"] != session.get("system_username")):
+        return jsonify(error="Backup schedule not found."), 404
+    try:
+        result = run_backup_schedule(schedule_id, allow_disabled=True)
+        audit("backup.schedule.run", row["domain"])
+        return jsonify(ok=True, **result)
+    except RuntimeError as exc:
+        audit("backup.schedule.run", row["domain"], "failed")
+        return jsonify(error=str(exc)), 400
+
+
+@app.delete("/api/backup-schedules/<schedule_id>")
+@require_auth
+@require_csrf
+def delete_backup_schedule(schedule_id):
+    with db() as c:
+        row = c.execute("SELECT * FROM backup_schedules WHERE id=?", (schedule_id,)).fetchone()
+        if not row or (session["role"] != "admin" and row["owner"] != session.get("system_username")):
+            return jsonify(error="Backup schedule not found."), 404
+        try:
+            c.execute("DELETE FROM backup_schedules WHERE id=?", (schedule_id,))
+            _sync_backup_schedules(c)
+        except RuntimeError as exc:
+            return jsonify(error=str(exc)), 400
+    audit("backup.schedule.delete", row["domain"])
+    return jsonify(ok=True)
+
+
 @app.get("/api/cron")
 @require_auth
 def list_scheduled_tasks():
@@ -4179,6 +4408,88 @@ def _validate_domain_for_backup(c, domain, username):
     return row
 
 
+def _create_backup_archive(domain, webroot, actor, schedule_id=None):
+    if not webroot or not Path(webroot).exists():
+        raise RuntimeError("Domain path not found.")
+    filename = f"{domain.replace('.', '_')}-{int(time.time())}-{secrets.token_hex(4)}.tar.gz"
+    backup_file = BACKUP_DIR / filename
+    try:
+        with tarfile.open(backup_file, "w:gz") as archive:
+            archive.add(webroot, arcname=".", recursive=True)
+    except Exception as exc:
+        backup_file.unlink(missing_ok=True)
+        raise RuntimeError(f"Backup failed: {exc}") from exc
+    size = backup_file.stat().st_size
+    with db() as c:
+        cursor = c.execute(
+            "INSERT INTO backups(domain,filename,size_bytes,created_by,created_at,schedule_id) VALUES(?,?,?,?,?,?)",
+            (domain,str(backup_file),size,actor,now(),schedule_id),
+        )
+    return {"id":cursor.lastrowid,"size":size,"filename":str(backup_file)}
+
+
+def _rclone_backup(row, local_filename):
+    kind = row["destination_type"] or "local"
+    if kind == "local":
+        return
+    if not shutil.which("rclone"):
+        raise RuntimeError("Remote backup support is unavailable because rclone is not installed.")
+    settings = _decrypt_backup_destination(row["destination_config"])
+    parser = configparser.RawConfigParser()
+    section = "masspanel_backup"
+    if kind in {"ftp", "sftp"}:
+        obscured = subprocess.run(["rclone", "obscure", settings["password"]], capture_output=True, text=True, timeout=15)
+        if obscured.returncode:
+            raise RuntimeError("Could not protect the remote backup password.")
+        parser[section] = {"type":kind, "host":settings["host"], "port":str(settings["port"]), "user":settings["username"], "pass":obscured.stdout.strip()}
+    else:
+        parser[section] = {"type":"drive", "scope":"drive.file", "token":json.dumps(settings["token"], separators=(",", ":"))}
+        if settings.get("client_id"): parser[section]["client_id"] = settings["client_id"]
+        if settings.get("client_secret"): parser[section]["client_secret"] = settings["client_secret"]
+    remote_dir = f"{section}:{row['remote_path'].strip('/')}/{row['domain']}"
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
+        parser.write(handle)
+        config_path = handle.name
+    try:
+        os.chmod(config_path, 0o600)
+        command = ["rclone", "copyto", local_filename, f"{remote_dir}/{Path(local_filename).name}", "--config", config_path, "--retries", "3"]
+        upload = subprocess.run(command, capture_output=True, text=True, timeout=3600)
+        if upload.returncode:
+            raise RuntimeError(f"Remote upload failed: {(upload.stderr or upload.stdout).strip()[:300]}")
+        listing = subprocess.run(["rclone", "lsf", remote_dir, "--files-only", "--config", config_path], capture_output=True, text=True, timeout=120)
+        if listing.returncode == 0:
+            prefix = row["domain"].replace(".", "_") + "-"
+            names = sorted((name.strip() for name in listing.stdout.splitlines() if name.strip().startswith(prefix) and name.strip().endswith(".tar.gz")), reverse=True)
+            for name in names[int(row["retention"]):]:
+                subprocess.run(["rclone", "deletefile", f"{remote_dir}/{name}", "--config", config_path], capture_output=True, timeout=120)
+    finally:
+        Path(config_path).unlink(missing_ok=True)
+
+
+def run_backup_schedule(schedule_id, allow_disabled=False):
+    with db() as c:
+        row = c.execute("SELECT s.*,d.webroot FROM backup_schedules s JOIN domains d ON d.domain=s.domain WHERE s.id=?", (schedule_id,)).fetchone()
+    if not row or (not row["enabled"] and not allow_disabled):
+        raise RuntimeError("Backup schedule is unavailable or paused.")
+    try:
+        result = _create_backup_archive(row["domain"],row["webroot"],"scheduled-backup",schedule_id)
+        _rclone_backup(row, result["filename"])
+        expired = []
+        with db() as c:
+            old = c.execute("SELECT id,filename FROM backups WHERE schedule_id=? ORDER BY id DESC LIMIT -1 OFFSET ?", (schedule_id,row["retention"])).fetchall()
+            expired = [dict(item) for item in old]
+            for item in old:
+                c.execute("DELETE FROM backups WHERE id=?", (item["id"],))
+            c.execute("UPDATE backup_schedules SET last_run_at=?,last_status='success',last_error='',updated_at=? WHERE id=?", (now(),now(),schedule_id))
+        for item in expired:
+            Path(item["filename"]).unlink(missing_ok=True)
+        return {"backup_id":result["id"],"size":result["size"],"removed":len(expired)}
+    except RuntimeError as exc:
+        with db() as c:
+            c.execute("UPDATE backup_schedules SET last_run_at=?,last_status='failed',last_error=?,updated_at=? WHERE id=?", (now(),str(exc)[:500],now(),schedule_id))
+        raise
+
+
 @app.post("/api/backups")
 @require_auth
 @require_csrf
@@ -4198,28 +4509,13 @@ def create_backup():
             return jsonify(error="This hosting package has reached its backup limit."), 409
         webroot = row["webroot"]
 
-    if not webroot or not Path(webroot).exists():
-        return jsonify(error="Domain path not found."), 400
-    filename = f"{domain.replace('.', '_')}-{int(time.time())}-{secrets.token_hex(4)}.tar.gz"
-    backup_file = BACKUP_DIR / filename
     try:
-        with tarfile.open(backup_file, "w:gz") as archive:
-            archive.add(webroot, arcname=".", recursive=True)
-    except Exception as exc:
-        if backup_file.exists():
-            backup_file.unlink(missing_ok=True)
-        return jsonify(error=f"Backup failed: {exc}"), 500
-
-    size = backup_file.stat().st_size
-    with db() as c:
-        cursor = c.execute(
-            "INSERT INTO backups(domain,filename,size_bytes,created_by,created_at) VALUES(?,?,?,?,?)",
-            (domain, str(backup_file), size, session["username"], now()),
-        )
-        b_id = cursor.lastrowid
+        result = _create_backup_archive(domain,webroot,session["username"])
+    except RuntimeError as exc:
+        return jsonify(error=str(exc)), 500
 
     audit("backup.create", domain)
-    return jsonify(ok=True, id=b_id, size=size)
+    return jsonify(ok=True, id=result["id"], size=result["size"])
 
 
 @app.get("/api/backups/<int:backup_id>/download")
