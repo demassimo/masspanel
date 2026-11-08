@@ -1,5 +1,9 @@
 # Mail security and owner-configured AI
 
+The owner now requires full PMG mail-feature coverage. The current implementation
+is a staged subset. See [the coverage register](PMG_FEATURE_COVERAGE.md) for the
+required capabilities, gaps, acceptance evidence and pending architecture choice.
+
 MassPanel prepares Rspamd message tracking, recipient-specific quarantine, sender
 rules and an optional Ollama/OpenAI-compatible connector. Installing or updating
 these files **does not activate mail routing**. The delivery worker defaults to
