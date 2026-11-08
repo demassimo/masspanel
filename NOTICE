@@ -1,10 +1,16 @@
 MassPanel
 Copyright (C) 2026 MassPanel contributors
 
-MassPanel is distributed under the GNU Affero General Public License,
-version 3 or (at your option) any later version. The complete licence is in
-LICENSE. Commercial use and charging for copies, hosting or support are
-permitted; recipients retain the freedoms granted by the AGPL.
+Original MassPanel code in this revision is distributed under the MassPanel
+Hosting License 1.0. The complete licence is in LICENSE, with scope and separate
+licences in LICENSING.md. Paid hosting, hosted accounts and genuine services are
+permitted; selling the software or activation entitlements requires separate
+written authorization. This is a source-available licence.
+
+Earlier AGPL releases retain their existing rights. Third-party components,
+upstream-derived modifications and the integration modules identified in
+LICENSING.md retain their own licences, including commercial redistribution
+rights. The former AGPL text is retained in licenses/AGPL-3.0-or-later.txt.
 
 MassPanel is an independent project and is not affiliated with, endorsed by,
 or sponsored by grommunio GmbH, the WordPress Foundation, Meta Platforms,

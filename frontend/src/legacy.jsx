@@ -13,7 +13,7 @@ const pageLabel = {
   overview: 'Dashboard', users: 'Users', websites: 'Websites', apps: 'App Installer', files: 'File manager',
   tools: 'Hosting tools', store: 'Storefront',
   databases: 'Databases', backups: 'Backups', imports: 'DirectAdmin import', dns: 'Domains & DNS', email: 'Email & Groupware',
-  security: 'Mail security', firewall: 'Firewall', storage: 'Server storage', updates: 'Updates', ssl: 'Certificates', tickets: 'Support', audit: 'Activity', licenses: 'Open source', settings: 'Settings',
+  security: 'Mail security', firewall: 'Firewall', storage: 'Server storage', updates: 'Updates', ssl: 'Certificates', tickets: 'Support', audit: 'Activity', licenses: 'Licences', settings: 'Settings',
 };
 
 const ADMIN_PAGES = ['overview', 'users', 'websites', 'apps', 'tools', 'store', 'files', 'databases', 'backups', 'imports', 'dns', 'email', 'security', 'firewall', 'storage', 'updates', 'ssl', 'tickets', 'audit', 'licenses', 'settings'];
@@ -2208,7 +2208,7 @@ function Audit() {
 }
 
 const THIRD_PARTY_COMPONENTS = [
-  { name: 'MassPanel', version: 'Current release', purpose: 'Hosting control panel and installer', license: 'AGPL-3.0-or-later', status: 'Deployed · source available', source: '/masspanel-corresponding-source.tar.gz' },
+  { name: 'MassPanel', version: 'Current release', purpose: 'Hosting control panel and installer', license: 'MassPanel Hosting License 1.0', status: 'Deployed · source available', source: '/masspanel-corresponding-source.tar.gz' },
   { name: 'AdminNeo', version: '5.7.0', purpose: 'Integrated MariaDB browser and editor', license: 'Apache-2.0 or GPL-2.0', status: 'Deployed · MassPanel SSO', source: 'https://github.com/adminneo-org/adminneo' },
   { name: 'FileBrowser Quantum', version: '1.5.3-stable', purpose: 'Advanced hosting file manager', license: 'Apache-2.0', status: 'Deployed · MassPanel SSO', source: 'https://github.com/gtsteffaniak/filebrowser' },
   { name: 'Gromox', version: '3.9', purpose: 'Primary groupware store, IMAP and EWS backend', license: 'AGPL-3.0-or-later', status: 'Deployed', source: 'https://github.com/grommunio/gromox/tree/gromox-3.9' },
@@ -2223,9 +2223,9 @@ const THIRD_PARTY_COMPONENTS = [
 function Licenses() {
   return (
     <>
-      <header className="page-header"><div><h1>Open-source components</h1><p>Source, version, licence and deployment status for code used or prepared by MassPanel.</p></div></header>
+      <header className="page-header"><div><h1>Source and licences</h1><p>Source, version, licence and deployment status for code used or prepared by MassPanel.</p></div></header>
       <section className="table-area">
-        <div className="hosting-plan-banner"><span><b>Source transparency</b> · MassPanel is AGPL-3.0-or-later. The complete deployed source, Grommunio modification and licence notices are available without charge.</span><span><a className="secondary" href="https://github.com/demassimo/masspanel" target="_blank" rel="noreferrer">GitHub</a> <a className="secondary" href="/masspanel-corresponding-source.tar.gz">Exact source</a></span></div>
+        <div className="hosting-plan-banner"><span><b>Source transparency</b> · Paid hosting and accounts are permitted. Selling MassPanel software requires written authorization under the MassPanel Hosting License 1.0. Upstream components retain their own licences. The complete deployed source and notices are available without charge.</span><span><a className="secondary" href="https://github.com/demassimo/masspanel" target="_blank" rel="noreferrer">GitHub</a> <a className="secondary" href="/masspanel-corresponding-source.tar.gz">Exact source</a></span></div>
         <div className="table-wrap">
           <table>
             <thead><tr><th>Component</th><th>Purpose</th><th>Licence</th><th>Status</th><th>Source</th></tr></thead>

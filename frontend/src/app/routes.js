@@ -18,11 +18,12 @@ export const ROUTES = {
   ssl: '/certificates',
   tickets: '/support',
   audit: '/activity',
-  licenses: '/open-source',
+  licenses: '/licences',
   settings: '/settings',
 };
 
 export const pageFromPath = (pathname) => {
+  if (pathname === '/open-source' || pathname.startsWith('/open-source/')) return 'licenses';
   if (pathname === '/wordpress' || pathname.startsWith('/wordpress/')) return 'apps';
   return Object.entries(ROUTES).find(([, path]) => pathname === path || pathname.startsWith(`${path}/`))?.[0] || 'overview';
 };
