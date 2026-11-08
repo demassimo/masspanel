@@ -11,6 +11,10 @@ DirectAdmin, Plesk, CyberPanel, HestiaCP or ISPConfig. MassPanel manages hosting
 customers, websites, domains, DNS, databases, applications, TLS certificates,
 backups, email and groupware from a single owner and customer portal.
 
+The administrator [DirectAdmin importer](docs/DIRECTADMIN_IMPORT.md) supports
+staged account restoration and verified Grommunio mail transfer. Read its
+prerequisites and compatibility limits before migrating production data.
+
 MassPanel is an independent project. It is not affiliated with, endorsed by or
 a drop-in clone of any product named above.
 

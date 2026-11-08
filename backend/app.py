@@ -36,6 +36,7 @@ from flask import Flask, jsonify, request, session, send_file, Response, make_re
 from werkzeug.middleware.proxy_fix import ProxyFix
 from jinja2 import BaseLoader, StrictUndefined, TemplateError, select_autoescape
 from jinja2.sandbox import SandboxedEnvironment
+from passwords import verify_password, supported_legacy_hash
 
 BASE = Path(os.environ.get("MASSPANEL_STATE_DIR", "/var/lib/masspanel"))
 DB_PATH = BASE / "masspanel.db"
@@ -55,7 +56,7 @@ CRON_FIELD = re.compile(r"^[0-9*/?,\-]+$")
 DB_NAME = re.compile(r"^[a-z][a-z0-9_]{2,31}$")
 DNS_TYPES = {"A", "AAAA", "CNAME", "MX", "TXT", "NS", "SPF", "SRV"}
 SHELLS = {"/bin/bash", "/bin/sh", "/usr/sbin/nologin"}
-SSL_MODES = {"disabled", "self", "letsencrypt"}
+SSL_MODES = {"disabled", "self", "letsencrypt", "imported"}
 TICKET_PRIORITIES = {"low", "normal", "high", "urgent"}
 TICKET_STATUS = {"open", "in_progress", "closed"}
 PUBLIC_SUFFIX_FILE = Path("/usr/share/publicsuffix/public_suffix_list.dat")
@@ -267,6 +268,17 @@ def _ensure_table(conn):
               created_by TEXT NOT NULL,
               created_at TEXT NOT NULL,
               FOREIGN KEY(domain) REFERENCES domains(domain) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS imported_databases(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              owner TEXT NOT NULL,
+              domain TEXT NOT NULL,
+              db_name TEXT NOT NULL UNIQUE,
+              db_user TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              created_by TEXT NOT NULL,
+              FOREIGN KEY(domain) REFERENCES domains(domain) ON DELETE RESTRICT
             );
 
             CREATE TABLE IF NOT EXISTS panel_settings(
@@ -774,6 +786,60 @@ def system_updates_rollback():
     return jsonify(result), 202
 
 
+@app.get("/api/imports/directadmin")
+@require_auth
+@require_admin
+def directadmin_import_list():
+    try:
+        result = helper({"operation": "directadmin_import", "action": "list"})
+    except RuntimeError as exc:
+        return jsonify(error=str(exc)), 502
+    return jsonify(result)
+
+
+@app.get("/api/imports/directadmin/<job>")
+@require_auth
+@require_admin
+def directadmin_import_status(job):
+    if not re.fullmatch(r"[a-f0-9]{32}", job):
+        return jsonify(error="Invalid import job."), 400
+    try:
+        result = helper({"operation": "directadmin_import", "action": "status", "job": job})
+    except RuntimeError as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(result)
+
+
+@app.post("/api/imports/directadmin")
+@require_auth
+@require_admin
+@require_csrf
+def directadmin_import_action():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or data.get("action") not in {"inspect", "start"}:
+        return jsonify(error="Choose inspection or restore."), 400
+    if limited((session["username"], "import"), 30, 3600):
+        return jsonify(error="Too many import requests. Try again later."), 429
+    payload = {"operation": "directadmin_import", "action": data["action"],
+               "actor": session["username"]}
+    if data["action"] == "inspect":
+        files = data.get("files")
+        if not isinstance(files, list) or not 1 <= len(files) <= 1000 or any(not isinstance(x, str) or len(x) > 160 for x in files):
+            return jsonify(error="Select valid staged backup files."), 400
+        payload["files"] = files
+    else:
+        if not isinstance(data.get("job"), str) or not re.fullmatch(r"[a-f0-9]{32}", data["job"]):
+            return jsonify(error="Invalid import job."), 400
+        payload.update(job=data["job"], confirm=data.get("confirm") is True,
+                       merge_admin=data.get("merge_admin") is True)
+    try:
+        result = helper(payload)
+    except RuntimeError as exc:
+        return jsonify(error=str(exc)), 400
+    audit("directadmin." + data["action"], result.get("job", ""))
+    return jsonify(result), 202
+
+
 def helper(payload):
     operation = payload.get("operation")
     if operation in {"wordpress_install", "application_install", "wordpress_action", "application_action", "domain_config", "domain_certificate_regenerate", "mail_certificate", "panel_certificate", "storefront_certificate"}:
@@ -1147,18 +1213,17 @@ def login():
             "FROM accounts WHERE username=? AND active=1",
             (username,),
         ).fetchone()
-    valid = False
-    if row:
-        try:
-            valid = ph.verify(row["password_hash"], password)
-        except VerifyMismatchError:
-            pass
+    valid = bool(row and verify_password(ph, row["password_hash"], password))
 
     if not valid:
         app.logger.warning("MASSPANEL_AUTH_FAILURE ip=%s username=%s", request.remote_addr, str(username)[:64])
         audit("login", outcome="failed", actor=username[:64] or "anonymous")
         return jsonify(error="Invalid username or password."), 401
 
+    if supported_legacy_hash(row["password_hash"]):
+        with db() as c:
+            c.execute("UPDATE accounts SET password_hash=? WHERE username=? AND password_hash=?",
+                      (ph.hash(password), username, row["password_hash"]))
     session.clear()
     session.permanent = True
     session.update(
@@ -1845,7 +1910,7 @@ def lock_user(username):
             account = c.execute("SELECT username,system_username,active FROM accounts WHERE system_username=? AND role='client'", (username,)).fetchone()
             if not account: return jsonify(error="Client account not found."), 404
             domains = [dict(row) for row in c.execute(
-                "SELECT d.domain,d.owner,d.webroot,d.ssl_mode,d.suspended,EXISTS(SELECT 1 FROM app_installations a WHERE a.domain=d.domain AND a.app_type='wordpress') AS wordpress FROM domains d WHERE d.owner=? ORDER BY d.domain",
+                "SELECT d.domain,d.owner,d.webroot,d.ssl_mode,d.suspended,(d.php_enabled OR EXISTS(SELECT 1 FROM app_installations a WHERE a.domain=d.domain AND a.app_type='wordpress')) AS wordpress FROM domains d WHERE d.owner=? ORDER BY d.domain",
                 (username,),
             )]
             addresses = [row["full_email"] for row in c.execute(
@@ -1886,7 +1951,7 @@ def unlock_user(username):
             account = c.execute("SELECT username,system_username,active FROM accounts WHERE system_username=? AND role='client'", (username,)).fetchone()
             if not account: return jsonify(error="Client account not found."), 404
             domains = [dict(row) for row in c.execute(
-                "SELECT d.domain,d.owner,d.webroot,d.ssl_mode,COALESCE(s.was_suspended,0) AS restore_suspended,EXISTS(SELECT 1 FROM app_installations a WHERE a.domain=d.domain AND a.app_type='wordpress') AS wordpress FROM domains d LEFT JOIN account_suspension_domains s ON s.username=? AND s.domain=d.domain WHERE d.owner=? ORDER BY d.domain",
+                "SELECT d.domain,d.owner,d.webroot,d.ssl_mode,COALESCE(s.was_suspended,0) AS restore_suspended,(d.php_enabled OR EXISTS(SELECT 1 FROM app_installations a WHERE a.domain=d.domain AND a.app_type='wordpress')) AS wordpress FROM domains d LEFT JOIN account_suspension_domains s ON s.username=? AND s.domain=d.domain WHERE d.owner=? ORDER BY d.domain",
                 (username,username),
             )]
             addresses = [row["full_email"] for row in c.execute(
@@ -1964,7 +2029,7 @@ def set_account_password():
             if not current_password:
                 return jsonify(error="Current password is required."), 400
             try:
-                if not ph.verify(row["password_hash"], current_password):
+                if not verify_password(ph, row["password_hash"], current_password):
                     return jsonify(error="Current password is incorrect."), 401
             except VerifyMismatchError:
                 return jsonify(error="Current password is incorrect."), 401
@@ -2200,12 +2265,12 @@ def create_domain():
 def suspend_domain(domain):
     domain = domain.lower().strip().strip(".")
     with db() as c:
-        row = c.execute("SELECT domain,owner,webroot,ssl_mode FROM domains WHERE domain=?", (domain,)).fetchone()
+        row = c.execute("SELECT domain,owner,webroot,ssl_mode,php_enabled FROM domains WHERE domain=?", (domain,)).fetchone()
         if not row:
             return jsonify(error="Domain not found."), 404
         wordpress = bool(c.execute("SELECT 1 FROM app_installations WHERE domain=? AND app_type='wordpress'", (domain,)).fetchone())
         try:
-            helper({"operation": "domain_config", "domain": domain, "owner": row["owner"], "webroot": row["webroot"], "ssl_mode": row["ssl_mode"], "suspended": True, "wordpress": wordpress})
+            helper({"operation": "domain_config", "domain": domain, "owner": row["owner"], "webroot": row["webroot"], "ssl_mode": row["ssl_mode"], "suspended": True, "wordpress": wordpress or bool(row["php_enabled"])})
         except RuntimeError as exc:
             return jsonify(error=str(exc)), 400
         c.execute("UPDATE domains SET suspended=1 WHERE domain=?", (domain,))
@@ -2220,12 +2285,12 @@ def suspend_domain(domain):
 def unsuspend_domain(domain):
     domain = domain.lower().strip().strip(".")
     with db() as c:
-        row = c.execute("SELECT domain,owner,webroot,ssl_mode FROM domains WHERE domain=?", (domain,)).fetchone()
+        row = c.execute("SELECT domain,owner,webroot,ssl_mode,php_enabled FROM domains WHERE domain=?", (domain,)).fetchone()
         if not row:
             return jsonify(error="Domain not found."), 404
         wordpress = bool(c.execute("SELECT 1 FROM app_installations WHERE domain=? AND app_type='wordpress'", (domain,)).fetchone())
         try:
-            helper({"operation": "domain_config", "domain": domain, "owner": row["owner"], "webroot": row["webroot"], "ssl_mode": row["ssl_mode"], "suspended": False, "wordpress": wordpress})
+            helper({"operation": "domain_config", "domain": domain, "owner": row["owner"], "webroot": row["webroot"], "ssl_mode": row["ssl_mode"], "suspended": False, "wordpress": wordpress or bool(row["php_enabled"])})
         except RuntimeError as exc:
             return jsonify(error=str(exc)), 400
         c.execute("UPDATE domains SET suspended=0 WHERE domain=?", (domain,))
@@ -2246,10 +2311,10 @@ def set_domain_ssl(domain):
         row = _domain_context(c, domain, session.get("system_username", ""))
         if not row:
             return jsonify(error="Domain not found or access denied."), 404
-        state = c.execute("SELECT suspended FROM domains WHERE domain=?", (domain,)).fetchone()
+        state = c.execute("SELECT suspended,php_enabled FROM domains WHERE domain=?", (domain,)).fetchone()
         wordpress = bool(c.execute("SELECT 1 FROM app_installations WHERE domain=? AND app_type='wordpress'", (domain,)).fetchone())
         try:
-            helper({"operation": "domain_config", "domain": domain, "owner": row["owner"], "webroot": row["webroot"], "ssl_mode": mode, "suspended": bool(state["suspended"]), "wordpress": wordpress, "email": product_settings().get("support_email", "")})
+            helper({"operation": "domain_config", "domain": domain, "owner": row["owner"], "webroot": row["webroot"], "ssl_mode": mode, "suspended": bool(state["suspended"]), "wordpress": wordpress or bool(state["php_enabled"]), "email": product_settings().get("support_email", "")})
         except RuntimeError as exc:
             audit("domain.ssl", domain, "failed")
             return jsonify(error=str(exc)), 400
@@ -2272,6 +2337,8 @@ def delete_domain(domain):
         ).fetchone()
         if not row:
             return jsonify(error="Domain not found."), 404
+        if c.execute("SELECT 1 FROM imported_databases WHERE domain=?", (domain,)).fetchone():
+            return jsonify(error="This domain owns imported MariaDB databases. Review and archive those databases before deleting the domain."), 409
         child_mail = c.execute("SELECT domain FROM mail_domains WHERE zone_domain=? AND domain<>zone_domain", (domain,)).fetchone()
         if child_mail:
             return jsonify(error=f"Delete the email subdomain {child_mail['domain']} from Email & Groupware first."), 409
@@ -3023,7 +3090,10 @@ def list_databases():
             app_rows = c.execute("SELECT id,owner,domain,db_name,db_user,application_slug,installed_at,installed_by,status FROM app_installations WHERE db_name<>'' AND db_name<>'pending' AND (?='' OR domain=?) ORDER BY domain,db_name", (domain,domain)).fetchall()
         else:
             app_rows = c.execute("SELECT id,owner,domain,db_name,db_user,application_slug,installed_at,installed_by,status FROM app_installations WHERE owner=? AND db_name<>'' AND db_name<>'pending' AND (?='' OR domain=?) ORDER BY domain,db_name", (session.get("system_username"),domain,domain)).fetchall()
+        imported = c.execute("SELECT * FROM imported_databases WHERE (?='' OR domain=?) AND (?='admin' OR owner=?) ORDER BY domain,db_name",
+                             (domain, domain, session['role'], session.get('system_username'))).fetchall()
     databases = [{**dict(r), "engine":"sqlite", "managed_application":False} for r in rows]
+    databases.extend({"id":f"import-{r['id']}","owner":r["owner"],"domain":r["domain"],"name":r["db_name"],"database_user":r["db_user"],"engine":"mariadb","managed_application":True,"application_slug":"directadmin","status":"active","created_at":r["created_at"],"created_by":r["created_by"]} for r in imported)
     databases.extend({"id":f"app-{r['id']}","owner":r["owner"],"domain":r["domain"],"name":r["db_name"],"database_user":r["db_user"],"engine":"mariadb","managed_application":True,"application_slug":r["application_slug"],"status":r["status"],"created_at":r["installed_at"],"created_by":r["installed_by"]} for r in app_rows)
     return jsonify(databases=databases)
 
@@ -3125,10 +3195,13 @@ def query_database(database_id):
 
 
 def _managed_database(database_ref):
-    match = re.fullmatch(r"app-(\d+)", str(database_ref))
+    match = re.fullmatch(r"(app|import)-(\d+)", str(database_ref))
     if not match: return None
     with db() as c:
-        row = c.execute("SELECT id,owner,domain,db_name,application_slug,status FROM app_installations WHERE id=? AND db_name<>'' AND db_name<>'pending'", (int(match.group(1)),)).fetchone()
+        if match.group(1) == 'import':
+            row = c.execute("SELECT id,owner,domain,db_name,'directadmin' AS application_slug,'active' AS status FROM imported_databases WHERE id=?", (int(match.group(2)),)).fetchone()
+        else:
+            row = c.execute("SELECT id,owner,domain,db_name,application_slug,status FROM app_installations WHERE id=? AND db_name<>'' AND db_name<>'pending'", (int(match.group(2)),)).fetchone()
     if not row or (session["role"] != "admin" and row["owner"] != session.get("system_username")): return None
     return row
 
@@ -3454,7 +3527,7 @@ def mail_status():
         hostname=hostname,
         ports=ports,
         ready=bool(hostname and all(ports.values())),
-        webmail_url=f"https://{hostname}/" if hostname else "",
+        webmail_url=f"https://{hostname}/web/" if hostname else "",
     )
 
 

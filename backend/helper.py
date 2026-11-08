@@ -85,7 +85,7 @@ def _mariadb_xml(sql, database=""):
 
 def _database_identifier(value, label="database"):
     value = str(value or "")
-    if not re.fullmatch(r"[A-Za-z0-9_]{1,64}", value): fail(f"Invalid {label} name.")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", value): fail(f"Invalid {label} name.")
     return value
 
 
@@ -284,10 +284,14 @@ def grant_panel_access(account, webroot):
 
 
 def write_domain_config(domain, webroot, ssl_mode="disabled", suspended=False, php_socket=None):
-    if ssl_mode not in {"disabled", "self", "letsencrypt"}: fail("Unsupported SSL mode.")
+    if ssl_mode not in {"disabled", "self", "letsencrypt", "imported"}: fail("Unsupported SSL mode.")
     if ssl_mode == "letsencrypt":
         cert = f"/etc/letsencrypt/live/{domain}/fullchain.pem"
         key = f"/etc/letsencrypt/live/{domain}/privkey.pem"
+    elif ssl_mode == "imported":
+        cert = f"/etc/masspanel/imported-tls/{domain}/fullchain.pem"
+        key = f"/etc/masspanel/imported-tls/{domain}/privkey.pem"
+        if not Path(cert).is_file() or not Path(key).is_file(): fail("Imported certificate files are unavailable.")
     else:
         cert = "/etc/masspanel/tls/masspanel.crt"
         key = "/etc/masspanel/tls/masspanel.key"
@@ -598,6 +602,8 @@ def dns_value(record_type, value):
 def sync_dns(payload):
     domain = payload.get("domain", "")
     if not isinstance(domain, str) or not DOMAIN.fullmatch(domain): fail("Invalid domain name.")
+    if (Path("/var/lib/bind/masspanel") / (domain + ".preserve")).exists():
+        fail("This imported zone contains records outside the panel editor's supported types. Manage the original zone file until those records have been reviewed; saving here would discard them.")
     primary_ns = str(payload.get("primary_ns") or f"ns1.{domain}").lower().strip().rstrip(".")
     secondary_ns = str(payload.get("secondary_ns") or f"ns2.{domain}").lower().strip().rstrip(".")
     if not DOMAIN.fullmatch(primary_ns) or not DOMAIN.fullmatch(secondary_ns) or primary_ns == secondary_ns:
@@ -651,12 +657,23 @@ def email_hash(payload):
     return {"password_hash": hashed}
 
 
+def grommunio_homeserver():
+    path = Path('/etc/masspanel/directadmin-import.json')
+    if not path.exists(): return '2'  # Preserve existing installations' default.
+    info = path.lstat()
+    if path.is_symlink() or not path.is_file() or info.st_uid != 0 or info.st_mode & 0o022:
+        fail('The mail import settings must be a protected root-owned regular file.')
+    value = json.loads(path.read_text()).get('homeserver', 0)
+    if type(value) is not int or not 0 <= value <= 65535: fail('Invalid Grommunio home server.')
+    return str(value)
+
+
 def grommunio_domain_create(payload):
     domain = str(payload.get("domain", "")).lower().strip().rstrip(".")
     if not DOMAIN.fullmatch(domain): fail("Invalid mail domain.")
     created = not grommunio_domain_users({"domain": domain})["exists"]
     if created:
-        run(["/usr/sbin/grommunio-admin", "domain", "create", "--homeserver", "2", "--maxUser", "1000", domain], timeout=90)
+        run(["/usr/sbin/grommunio-admin", "domain", "create", "--homeserver", grommunio_homeserver(), "--maxUser", "1000", domain], timeout=90)
     return {"domain": domain, "created": created}
 
 
@@ -713,7 +730,7 @@ def grommunio_email_create(payload):
         if len(password) < 12 or len(password) > 256: fail("Mailbox password must contain 12-256 characters.")
         shown = subprocess.run(["/usr/sbin/grommunio-admin", "user", "show", address], capture_output=True, text=True, timeout=30)
         if shown.returncode != 0:
-            run(["/usr/sbin/grommunio-admin", "user", "create", "--homeserver", "2", "--lang", "en_US",
+            run(["/usr/sbin/grommunio-admin", "user", "create", "--homeserver", grommunio_homeserver(), "--lang", "en_US",
                  "--pop3-imap", "true", "--privWeb", "true", "--privDav", "true", "--privEas", "true", "--smtp", "true", address], timeout=120)
         run(["/usr/sbin/grommunio-admin", "passwd", "--password", password, address], timeout=60)
     return {"full_email": address, "forward": bool(destination)}
@@ -850,7 +867,7 @@ def grommunio_system_mailbox_configure(payload):
     shown = subprocess.run(["/usr/sbin/grommunio-admin", "user", "show", mailbox], capture_output=True, text=True, timeout=30)
     created = shown.returncode != 0
     if created:
-        run(["/usr/sbin/grommunio-admin", "user", "create", "--changePassword", "false", "--homeserver", "2", "--lang", "en_US",
+        run(["/usr/sbin/grommunio-admin", "user", "create", "--changePassword", "false", "--homeserver", grommunio_homeserver(), "--lang", "en_US",
              "--pop3-imap", "true", "--privWeb", "true", "--privDav", "false", "--privEas", "false", "--smtp", "false", mailbox], timeout=120)
     else:
         run(["/usr/sbin/grommunio-admin", "user", "modify", "--pop3-imap", "true", "--privWeb", "true", "--smtp", "false", mailbox], timeout=60)
@@ -2028,7 +2045,13 @@ def main():
     if os.geteuid() != 0: fail("Privileged helper must run as root.")
     payload = read_helper_payload(sys.stdin.buffer)
     operation = payload.get("operation")
-    if operation == "list": result = {"users": list_users()}
+    if operation == "directadmin_import":
+        proc = subprocess.run(["/opt/masspanel/venv/bin/python", "/opt/masspanel/backend/directadmin_import.py"],
+                              input=json.dumps(payload), text=True, capture_output=True, timeout=25)
+        try: result = json.loads(proc.stdout)
+        except ValueError: fail("The DirectAdmin importer is unavailable; update the backend modules.")
+        if not result.get("ok"): fail(result.get("error", "Import request failed."))
+    elif operation == "list": result = {"users": list_users()}
     elif operation == "create": result = create_user(payload)
     elif operation == "remove_new": result = remove_new(payload)
     elif operation == "remove": result = remove_new(payload)

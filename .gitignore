@@ -19,5 +19,8 @@ coverage/
 installer.env
 cloudflare-connections.json
 credentials.json
+source-inventory.json
+*.private.json
+directadmin-source.json
 outputs/
 third_party/source-archives/gromox-container-0.0.4.tar.gz
