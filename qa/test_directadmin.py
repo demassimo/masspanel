@@ -81,6 +81,26 @@ class DirectAdminTests(unittest.TestCase):
         self.assertEqual(len(mappings), 2)
         self.assertEqual(mappings[1], ['Sent', 'Sent Items', None])
 
+    def test_subdomain_custom_document_root_is_preserved_and_validated(self):
+        entries = [('backup/user.conf', b'username=alice\nusertype=user\n'),
+            ('backup/.shadow', HASH.encode()), ('backup/example.com/domain.conf', b'php1_select=1\n'),
+            ('backup/example.com/subdomain.list', b'billing\n')]
+        path = self.archive(entries)
+        self.assertFalse(importer.inspect_archive(path)['web_inventory_complete'])
+        identities = {'accounts':[{'username':'alice','password_hash':HASH}],
+            'domains':[{'domain':'example.com','owner':'alice'}],
+            'mail':[{'domain':'example.com','accounts':[]}],
+            'websites':[{'owner':'alice','domain':'example.com','parent':'example.com','relative_webroot':'domains/example.com/public_html','php_selector':'1'},
+                {'owner':'alice','domain':'billing.example.com','parent':'example.com','relative_webroot':'domains/billing.example.com/app/public','php_selector':'1'}]}
+        importer.IDENTITIES.write_text(json.dumps(identities)); importer.IDENTITIES.chmod(0o600)
+        plan = importer.inspect_archive(path)
+        self.assertTrue(plan['web_inventory_complete'])
+        self.assertEqual(plan['websites'][1]['relative_webroot'],'domains/billing.example.com/app/public')
+        for unsafe in ('../../etc', 'domains/../../bob/private', 'domains/site;include /etc/nginx/*'):
+            identities['websites'][1]['relative_webroot']=unsafe
+            importer.IDENTITIES.write_text(json.dumps(identities))
+            with self.assertRaises(importer.ImportError): importer.inspect_archive(path)
+
     def test_metadata_verification_retains_labels_and_ignores_recent(self):
         from directadmin_mail_verify import metadata
         class Client:
@@ -147,6 +167,8 @@ class DirectAdminTests(unittest.TestCase):
         plan = {'metadata': {'alice_db.conf':'db_collation=latin1_swedish_ci'}}
         with patch('directadmin_restore.sql', return_value='latin1\n'):
             self.assertEqual(database_collation(plan,'alice_db'),('latin1','latin1_swedish_ci'))
+            plan['metadata']['alice_db.conf']='db_collation='+urlencode({'DEFAULT_CHARACTER_SET_NAME':'latin1','DEFAULT_COLLATION_NAME':'latin1_swedish_ci','SCHEMA_NAME':'alice_db'})
+            self.assertEqual(database_collation(plan,'alice_db'),('latin1','latin1_swedish_ci'))
         with patch('directadmin_restore.sql', return_value=''):
             with self.assertRaises(importer.ImportError): database_collation(plan,'alice_db')
         plan['metadata']['alice_db.conf']='db_collation=latin1; DROP DATABASE mysql'
@@ -174,11 +196,12 @@ class DirectAdminTests(unittest.TestCase):
         fake = type('Panel', (), {})()
         fake.db = lambda: self.connection
         fake.license_status = lambda conn: {'domain_limit': 20, 'domain_count': 0}
+        fake.is_root_domain = lambda domain: True
         import sqlite3
         self.connection = sqlite3.connect(':memory:')
         with patch.dict(sys.modules, {'app': fake}), patch('directadmin_restore.run') as command:
-            with self.assertRaisesRegex(importer.ImportError, '25 domains'):
-                preflight([{'username': 'alice', 'domains': [{}] * 25}], {}, [], {})
+            with self.assertRaisesRegex(importer.ImportError, '25 root domains'):
+                preflight([{'username': 'alice', 'domains': [{'domain':'example.com'}] * 25}], {}, [], {})
             command.assert_not_called()
 
 

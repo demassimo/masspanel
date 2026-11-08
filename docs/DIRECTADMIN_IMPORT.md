@@ -29,7 +29,10 @@ then securely copy its output to
 `/var/lib/masspanel-imports/directadmin/source-inventory.json` (root, 0600).
 This preserves current hosting and mailbox hashes, including default mailboxes
 whose password differs from their hosting account password. Refresh this export
-and inspect again after source password changes.
+and inspect again after source password changes. The export also records primary
+and subdomain document roots, including URL-encoded DirectAdmin overrides.
+Imported roots are restricted to the owning account's domains directory and
+recorded in root-owned `/etc/masspanel/imported-webroots.json`.
 
 ## Read-only mail connection
 
@@ -62,7 +65,9 @@ Run `sudo python3 deploy/install-directadmin-imapsync.py` on the destination.
 It installs a SHA-256-verified, pinned imapsync revision and a small Gromox
 compatibility adjustment. Gromox can reject custom keywords during large
 APPEND requests; the adjustment sends supported APPEND flags, then applies the
-original flags with STORE using `--syncflagsaftercopy --nofilterflags`.
+original flags with STORE using `--syncflagsaftercopy --nofilterflags`. If an
+immediate post-APPEND FETCH returns no flags, the known destination UID is
+still updated with STORE; a STORE failure remains a transfer error.
 Original and modified source and notices are installed under
 `/usr/share/masspanel/source/imapsync`.
 
@@ -88,6 +93,8 @@ Original and modified source and notices are installed under
 Some Gromox versions derive IMAP INTERNALDATE from the Received header. Messages
 without that header can expose an incorrect date after APPEND. The importer
 detects this and stops for review; it does not silently rewrite message headers.
+The optional revision-pinned fix in [Gromox INTERNALDATE](GROMOX_INTERNALDATE.md)
+uses the stored delivery timestamp without changing message content.
 Concurrent source deliveries or flag changes can also require another delta
 and verification pass before cutover.
 
@@ -119,7 +126,7 @@ backups until the migration is accepted. Remove migration SSH keys afterwards.
 ## Settings requiring separate migration review
 
 This importer does not claim that every DirectAdmin feature has an equivalent.
-Cron jobs, domain pointers, custom subdomain document roots, OpenLiteSpeed or
+Cron jobs, domain pointers, OpenLiteSpeed or
 Apache rewrite rules, autoresponders/vacation rules, spam rules, DKIM settings,
 webmail contacts/preferences and application-management registrations require
 separate review. Their original data remains in the source/native backups.

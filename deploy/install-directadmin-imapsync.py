@@ -25,7 +25,14 @@ def patch_source(content):
     source = content.decode('utf-8')
     if hashlib.sha256(content).hexdigest() != SHA256 or source.count(ORIGINAL) != 1:
         raise ValueError('Unexpected imapsync source; installation stopped.')
-    return source.replace(ORIGINAL, REPLACEMENT)
+    fallback = '                myprint( "Host2: msg $h2_fold/$h2_msg : could not get its flags to sync them after the copy\\n" ) ;'
+    # A newly appended Gromox message can return no flags on the first FETCH.
+    # Its APPEND UID is already known: apply the source flags through STORE.
+    # sync_flags reports a STORE failure as an imapsync error.
+    if source.count(fallback) != 1:
+        raise ValueError('Unexpected imapsync flag fallback; installation stopped.')
+    return source.replace(ORIGINAL, REPLACEMENT).replace(fallback,
+        fallback + '\n                sync_flags( $mysync, $h1_fold, $h1_msg, $h1_flags, $h2_fold, $h2_msg, q{} ) ;')
 
 
 def main():

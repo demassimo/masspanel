@@ -55,3 +55,13 @@ publishes its APPEND compatibility adjustment with the installed source.
 - Publish the corresponding-source archive beside every binary installer.
 - Commercial use and paid support are permitted. AGPL/GPL recipients retain
   their rights to copy, inspect, change and redistribute covered software.
+
+### Optional Gromox INTERNALDATE correction
+
+`deploy/patch-gromox-internaldate.py` changes only the transient midb response
+digest in Gromox revision `01cda79696b5ce97c4283a1868dc4dddfa7b3987`.
+It reports the stored delivery timestamp as IMAP INTERNALDATE, retaining exact
+RFC822 message bytes. The modified file retains its upstream copyright and
+SPDX `GPL-2.0-only WITH linking exception` notice. The complete source tree
+contains additional component-specific notices, all retained. Build details and
+source-offer requirements are in `docs/GROMOX_INTERNALDATE.md`.

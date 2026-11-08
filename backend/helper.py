@@ -265,10 +265,21 @@ def domain_paths(domain, owner, webroot, require_exists=True):
     except KeyError: fail("Website owner does not exist.")
     home = Path(account.pw_dir).resolve(strict=True)
     expected_lexical = Path(account.pw_dir) / "domains" / domain / "public_html"
+    imported_roots = Path('/etc/masspanel/imported-webroots.json')
+    if imported_roots.exists():
+        info = imported_roots.lstat()
+        if imported_roots.is_symlink() or not imported_roots.is_file() or info.st_uid != 0 or info.st_mode & 0o022:
+            fail('Imported website paths must be protected by root.')
+        entry = json.loads(imported_roots.read_text()).get(domain)
+        if entry:
+            if entry.get('owner') != owner: fail('Imported website owner does not match.')
+            expected_lexical = Path(entry['webroot'])
+            if not expected_lexical.is_relative_to(Path(account.pw_dir) / 'domains') or '..' in expected_lexical.parts:
+                fail('Imported website root is outside the account domains directory.')
     supplied_lexical = Path(os.path.abspath(str(webroot)))
     if supplied_lexical != Path(os.path.abspath(str(expected_lexical))): fail("Invalid website root.")
     current = Path(account.pw_dir)
-    for component in ("domains", domain, "public_html"):
+    for component in expected_lexical.relative_to(Path(account.pw_dir)).parts:
         current = current / component
         if current.is_symlink(): fail("Website paths cannot contain symbolic links.")
     root = supplied_lexical.resolve(strict=require_exists)

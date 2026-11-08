@@ -86,11 +86,22 @@ def runtime_settings():
 
 def database_collation(plan, database):
     value = config(plan['metadata'].get(database + '.conf', '')).get('db_collation', 'utf8mb4_unicode_ci')
+    source_charset = None
+    if '=' in value:
+        fields = parse_qs(value, keep_blank_values=True)
+        if any(len(items) != 1 for items in fields.values()) or fields.get('SCHEMA_NAME', [database])[0] != database:
+            raise ImportError('Conflicting source database collation metadata.')
+        source_charset = fields.get('DEFAULT_CHARACTER_SET_NAME', [''])[0]
+        value = fields.get('DEFAULT_COLLATION_NAME', [''])[0]
+        if not re.fullmatch(r'[A-Za-z0-9_]{1,64}', source_charset):
+            raise ImportError('Invalid source database character set.')
     if not re.fullmatch(r'[A-Za-z0-9_]{1,64}', value):
         raise ImportError('Invalid source database collation.')
     charset = sql('SELECT CHARACTER_SET_NAME FROM information_schema.COLLATIONS WHERE COLLATION_NAME=' + sql_literal(value)).strip()
     if not re.fullmatch(r'[A-Za-z0-9_]{1,64}', charset):
         raise ImportError('The source database collation is unavailable on the destination: ' + value)
+    if source_charset and source_charset != charset and {source_charset, charset} != {'utf8', 'utf8mb3'}:
+        raise ImportError('Source and destination database character sets differ.')
     return charset, value
 
 
@@ -100,12 +111,15 @@ def preflight(plans, options, completed, settings):
     import app as panel
     with panel.db() as conn:
         license = panel.license_status(conn)
-        new_domains = sum(len(p['domains']) for p in plans if p['username'] not in completed)
+        new_domains = sum(panel.is_root_domain(site['domain']) for p in plans if p['username'] not in completed
+                          for site in p.get('websites', p['domains']))
         if license['domain_limit'] is not None and license['domain_count'] + new_domains > license['domain_limit']:
-            raise ImportError(f"This import needs {license['domain_count'] + new_domains} domains, but the current MassPanel license permits {license['domain_limit']}. Activate sufficient capacity, then retry.")
+            raise ImportError(f"This import needs {license['domain_count'] + new_domains} root domains, but the current MassPanel license permits {license['domain_limit']}. Activate sufficient capacity, then retry.")
         for p in plans:
             if not p.get('mail_inventory_complete'):
                 raise ImportError('Export current source identities and inspect again so default mailboxes and their original passwords are included.')
+            if not p.get('web_inventory_complete'):
+                raise ImportError('Export current source website routing and inspect again to preserve subdomain document roots.')
             if fingerprint(archive_path(p['file'])) != p['fingerprint']:
                 raise ImportError('A staged archive changed after inspection. Inspect it again.')
             if p['username'] in completed: continue
@@ -119,17 +133,26 @@ def preflight(plans, options, completed, settings):
             except KeyError: pass
             else: raise ImportError('System username already exists: ' + username + '. A partial restore requires operator review.')
             if (Path('/home') / username).exists(): raise ImportError('An account home directory already exists: ' + username)
-            selectors = {d['config'].get('php1_select', '1') or '1' for d in p['domains']}
+            selectors = {d['php_selector'] for d in p['websites']}
             if len(selectors) > 1:
                 raise ImportError('This account uses multiple PHP selectors. Configure separate per-domain pools before importing ' + username)
-            for d in p['domains']:
+            registry = Path('/etc/masspanel/imported-webroots.json')
+            roots = {}
+            if registry.exists() or registry.is_symlink():
+                info = registry.lstat()
+                if registry.is_symlink() or not registry.is_file() or info.st_uid != 0 or info.st_mode & 0o022:
+                    raise ImportError('Imported website mappings must be a protected root-owned file.')
+                roots = json.loads(registry.read_text())
+                if not isinstance(roots, dict): raise ImportError('Invalid imported website mappings.')
+            for d in p['websites']:
                 domain = d['domain']
+                if domain in roots: raise ImportError('Imported website mapping already exists: ' + domain)
                 if conn.execute('SELECT 1 FROM domains WHERE domain=?', (domain,)).fetchone():
                     raise ImportError('Destination domain already exists: ' + domain)
                 for candidate in (Path('/etc/nginx/sites-available') / ('masspanel-domain-' + domain + '.conf'),
                                   Path('/var/lib/bind/masspanel') / (domain + '.zone')):
                     if candidate.exists(): raise ImportError('An existing website or DNS configuration conflicts with ' + domain)
-                selector = d['config'].get('php1_select', '1') or '1'
+                selector = d['php_selector']
                 version = settings['php_versions'].get(selector)
                 if not version or not Path('/etc/php', version, 'fpm/pool.d').is_dir():
                     raise ImportError('Install and map PHP selector ' + selector + ' before importing ' + domain + '. No PHP version was silently changed.')
@@ -233,10 +256,10 @@ def restore_dns(domain, stage, conn, stamp, actor):
         target.with_suffix('.preserve').write_text('Imported records requiring manual DNS management: ' + ', '.join(sorted(set(unsupported))))
 
 
-def restore_certificate(domain, stage):
+def restore_certificate(domain, stage, source_domain=None):
     from cryptography import x509
     from cryptography.hazmat.primitives import serialization
-    directory = stage / 'backup' / domain
+    directory = stage / 'backup' / (source_domain or domain)
     cert = directory / 'domain.cert'; key = directory / 'domain.key'
     if not cert.is_file() or not key.is_file() or not cert.stat().st_size or not key.stat().st_size:
         return 'self'
@@ -245,6 +268,11 @@ def restore_certificate(domain, stage):
     def public(value):
         return value.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
     if public(certificate) != public(private_key): raise ImportError('Certificate/key mismatch for ' + domain)
+    try: names = certificate.extensions.get_extension_for_class(x509.SubjectAlternativeName).value.get_values_for_type(x509.DNSName)
+    except x509.ExtensionNotFound:
+        names = [value.value for value in certificate.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)]
+    if not any(name.lower() == domain or (name.startswith('*.') and domain.endswith(name[1:].lower()) and domain.count('.') == name.count('.')) for name in names):
+        return 'self'
     target = Path('/etc/masspanel/imported-tls') / domain
     target.mkdir(mode=0o700, parents=True, exist_ok=False)
     chain = cert.read_bytes().rstrip() + b'\n'
@@ -310,10 +338,16 @@ def restore_account(plan, stage, work, options, settings, panel, actor):
         else:
             conn.execute('INSERT INTO accounts(username,password_hash,role,system_username,active,domain_limit,disk_limit_mb,created_at) VALUES(?,?,?,?,?,?,?,?)',
                          (username, plan['hash'], role, username, int(not suspended), limit, quota, stamp))
-        for d in plan['domains']:
-            domain = d['domain']; webroot = home / 'domains' / domain / 'public_html'
+        for d in plan['websites']:
+            domain = d['domain']; webroot = home / d['relative_webroot']
             if webroot.is_symlink() or not webroot.is_dir(): raise ImportError('Website root is missing or linked: ' + domain)
-            version = settings['php_versions'][d['config'].get('php1_select', '1') or '1']
+            registry = Path('/etc/masspanel/imported-webroots.json')
+            roots = json.loads(registry.read_text()) if registry.exists() else {}
+            if domain in roots: raise ImportError('Imported website mapping already exists: ' + domain)
+            roots[domain] = {'owner': username, 'webroot': str(webroot)}
+            atomic_json(registry, roots)
+            helper.domain_paths(domain, username, webroot)
+            version = settings['php_versions'][d['php_selector']]
             socket_path = '/run/php/masspanel-' + username + '.sock'
             pool = Path('/etc/php', version, 'fpm/pool.d', 'masspanel-' + username + '.conf')
             if not pool.exists():
@@ -322,10 +356,12 @@ def restore_account(plan, stage, work, options, settings, panel, actor):
                 run(['/usr/bin/systemctl', 'reload', 'php' + version + '-fpm'])
             home.chmod(0o711)
             helper.grant_panel_access(system, webroot)
-            ssl_mode = restore_certificate(domain, stage)
+            ssl_mode = restore_certificate(domain, stage, d['parent'])
             helper.write_domain_config(domain, webroot, ssl_mode, suspended, socket_path)
             conn.execute('INSERT INTO domains(domain,owner,webroot,suspended,ssl_mode,php_enabled,created_at,created_by) VALUES(?,?,?,?,?,1,?,?)',
                          (domain, username, str(webroot), int(suspended), ssl_mode, stamp, actor))
+        for d in plan['domains']:
+            domain = d['domain']
             restore_dns(domain, stage, conn, stamp, actor)
             if plan['mailboxes']:
                 run(['/usr/sbin/grommunio-admin', 'domain', 'create', '--homeserver', str(settings.get('homeserver', 0)), '-u', '1000', domain])

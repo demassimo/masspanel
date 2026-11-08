@@ -228,6 +228,7 @@ def inspect_archive(path):
             warnings.append('Mail autoresponders/vacations are preserved and require review before cutover.')
             break
     complete = not domains
+    identities = {}
     if IDENTITIES.exists():
         info = IDENTITIES.lstat()
         if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077 or info.st_size > MAX_METADATA:
@@ -252,12 +253,44 @@ def inspect_archive(path):
         complete = True
     elif domains:
         warnings.append('Native backups omit default mailbox password records. Export source identities before restoring mail.')
+    expected_sites = {d['domain'] for d in domains}
+    for d in domains:
+        for sub in metadata.get(d['domain'] + '/subdomain.list', '').splitlines():
+            sub = sub.strip()
+            if sub:
+                hostname = sub + '.' + d['domain']
+                if not DOMAIN.fullmatch(hostname): raise ImportError('Invalid source subdomain.')
+                expected_sites.add(hostname)
+    sites = [s for s in identities.get('websites', []) if s.get('owner') == username]
+    complete_web = bool(sites) or not domains
+    if not sites:
+        sites = [{'domain': d['domain'], 'parent': d['domain'], 'owner': username,
+                  'relative_webroot': 'domains/' + d['domain'] + '/public_html',
+                  'php_selector': d['config'].get('php1_select', '1') or '1'} for d in domains]
+        complete_web = len(expected_sites) == len(domains)
+    parents = {d['domain'] for d in domains}
+    for site in sites:
+        domain = site.get('domain', ''); parent = site.get('parent', '')
+        root = site.get('relative_webroot', '')
+        if (not DOMAIN.fullmatch(domain) or parent not in parents or not (domain == parent or domain.endswith('.' + parent))
+                or not re.fullmatch(r'domains/[A-Za-z0-9._/-]+', root)
+                or any(part in {'.', '..'} for part in PurePosixPath(root).parts)
+                or not re.fullmatch(r'[1-9][0-9]*', site.get('php_selector', ''))):
+            raise ImportError('Unsafe or incomplete source website routing metadata.')
+    actual_sites = [site['domain'] for site in sites]
+    if len(set(actual_sites)) != len(actual_sites) or (complete_web and set(actual_sites) != expected_sites):
+        raise ImportError('Website routing does not match the native backup subdomains.')
+    if not complete_web:
+        warnings.append('Export current source identities with website routing to preserve subdomain document roots.')
+    if len(sites) > len(domains):
+        warnings.append(f'{len(sites) - len(domains)} subdomain websites and their document roots will also be restored.')
     if fingerprint(path) != original_fingerprint:
         raise ImportError('The backup changed during inspection; stage a completed backup and retry.')
     return {'file': path.name, 'fingerprint': original_fingerprint, 'username': username,
             'account': account, 'hash': encoded, 'locked': locked, 'metadata': metadata,
             'domains': domains, 'databases': sorted(set(databases)), 'mailboxes': mailboxes,
             'mail_inventory_complete': complete,
+            'web_inventory_complete': complete_web, 'websites': sites,
             'expanded_bytes': expanded, 'warnings': warnings}
 
 
@@ -266,6 +299,7 @@ def public_account(plan):
             'role': plan['account'].get('usertype', 'user'),
             'suspended': plan['account'].get('suspended') == 'yes' or plan['locked'],
             'domains': [d['domain'] for d in plan['domains']],
+            'websites': [site['domain'] for site in plan.get('websites', [])],
             'databases': plan['databases'], 'mailboxes': len(plan['mailboxes']),
             'expanded_bytes': plan['expanded_bytes'], 'passwords': 'Preserved (SHA-512)',
             'warnings': plan['warnings']}
@@ -356,7 +390,7 @@ def worker(job, phase):
                     plans.append(inspect_archive(archive_path(name)))
                     report(job, accounts=[public_account(p) for p in plans])
                 usernames = [p['username'] for p in plans]
-                domains = [d['domain'] for p in plans for d in p['domains']]
+                domains = [d['domain'] for p in plans for d in p['websites']]
                 if len(set(usernames)) != len(usernames) or len(set(domains)) != len(domains):
                     raise ImportError('Duplicate accounts or domains occur in the selected backups.')
                 atomic_json(path / 'plan.private.json', plans)
