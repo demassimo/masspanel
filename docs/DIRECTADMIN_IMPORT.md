@@ -34,6 +34,13 @@ and subdomain document roots, including URL-encoded DirectAdmin overrides.
 Imported roots are restricted to the owning account's domains directory and
 recorded in root-owned `/etc/masspanel/imported-webroots.json`.
 
+A native database backup can contain data but no user credentials. Import is
+blocked by default. After checking the live source grant tables and confirming
+that no named database user is associated with it, an operator can list its exact name in
+`databases_without_users` in the root-owned import settings. Its data and
+collation are restored without creating anonymous access or a new password.
+The panel records an empty database-user field for this case.
+
 ## Read-only mail connection
 
 Install `deploy/directadmin-imap-source.py` as
@@ -75,7 +82,8 @@ Original and modified source and notices are installed under
 
 - Hosting usernames, supported SHA-512-crypt passwords, and suspension status
   are retained. Successful panel login upgrades the stored hash to Argon2
-  without changing the user's password.
+  without changing the user's password. An imported username never joins an
+  existing destination system group; a separate group is created when names collide.
 - Original database names, supported mysql_native_password hashes, access
   hosts and database grants are retained. SQL is restored using a temporary
   database-scoped account, not root SQL privileges.
@@ -85,6 +93,8 @@ Original and modified source and notices are installed under
 - Mail folders, subscriptions, messages, flags and internal dates are copied
   through IMAP. No delete or expunge option is enabled. Passwords are changed
   temporarily only on the staged destination and restored in a finally block.
+- DirectAdmin unlimited mailbox quotas are mapped to absent Grommunio quota
+  limits, not zero bytes. Finite quotas apply to storage, send and receive limits.
 - Every copied mailbox is checked against the source using imapsync UID
   mappings: source-message coverage, flags (excluding session-only Recent),
   internal dates and RFC822 sizes must agree. Private verification reports

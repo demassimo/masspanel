@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tarfile
 import time
+import traceback
 import uuid
 from pathlib import Path, PurePosixPath
 
@@ -405,6 +406,7 @@ def worker(job, phase):
     except Exception:
         # Exception strings from subprocesses/SQL can contain credentials. Keep
         # the public report and journal free of raw SQL or archive content.
+        atomic_json(path / 'error.private.json', {'traceback': traceback.format_exc()})
         report(job, phase='failed', message='The import stopped unexpectedly. Existing source data is unchanged; review the server and preserved job files.')
         raise SystemExit(1)
 

@@ -162,6 +162,38 @@ class DirectAdminTests(unittest.TestCase):
         for invalid in ('mysql', 'grommunio', 'name`; DROP DATABASE mysql;'):
             with self.assertRaises(importer.ImportError): database_users(plan, invalid)
 
+    def test_unlimited_mail_quota_is_not_zero_space(self):
+        from directadmin_restore import create_mailbox
+        with patch('directadmin_restore.run') as command:
+            create_mailbox('alice@example.com', 0, 0)
+            self.assertNotIn('--property', command.call_args_list[0].args[0])
+            self.assertEqual(command.call_args_list[1].args[0].count('--remove-property'), 3)
+        with patch('directadmin_restore.run') as command:
+            create_mailbox('alice@example.com', 1048576, 0)
+            self.assertEqual(command.call_count, 1)
+            self.assertIn('storagequotalimit=1024', command.call_args.args[0])
+            self.assertIn('prohibitreceivequota=1024', command.call_args.args[0])
+        with patch('directadmin_restore.run') as command:
+            with self.assertRaises(importer.ImportError): create_mailbox('alice@example.com', -1, 0)
+            command.assert_not_called()
+
+    def test_import_never_joins_existing_system_group(self):
+        from directadmin_restore import new_primary_group
+        def lookup(name):
+            if name == 'admin': return object()
+            raise KeyError(name)
+        with patch('directadmin_restore.grp.getgrnam', side_effect=lookup):
+            self.assertEqual(new_primary_group('admin'), 'mp_admin')
+            self.assertIsNone(new_primary_group('alice'))
+        with patch('directadmin_restore.grp.getgrnam', return_value=object()):
+            with self.assertRaises(importer.ImportError): new_primary_group('admin')
+
+    def test_orphan_database_requires_explicit_review(self):
+        plan = {'metadata': {'alice_old.conf': 'db_collation=latin1_swedish_ci'}}
+        with self.assertRaises(importer.ImportError): database_users(plan, 'alice_old')
+        self.assertEqual(database_users(plan, 'alice_old', allow_empty=True), [])
+        with self.assertRaises(importer.ImportError): database_users(plan, 'mysql', allow_empty=True)
+
     def test_database_collation_is_retained_and_validated(self):
         from directadmin_restore import database_collation
         plan = {'metadata': {'alice_db.conf':'db_collation=latin1_swedish_ci'}}

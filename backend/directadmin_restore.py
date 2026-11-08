@@ -5,6 +5,7 @@ operator review instead of overwriting resources whose ownership is uncertain.
 """
 import datetime
 import grp
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -35,7 +36,10 @@ PRIVILEGES = {'select_priv': 'SELECT', 'insert_priv': 'INSERT', 'update_priv': '
 
 
 def run(command, data=None, timeout=120):
-    result = subprocess.run(command, input=data, text=True, capture_output=True, timeout=timeout)
+    # Grommunio creates shared parent directories before setting mail-store modes.
+    # The worker's private 0077 mask would make those parents inaccessible to gromox.
+    mask = 0o007 if Path(command[0]).name == 'grommunio-admin' else -1
+    result = subprocess.run(command, input=data, text=True, capture_output=True, timeout=timeout, umask=mask)
     if result.returncode:
         raise ImportError('Restore command failed: ' + Path(command[0]).name + '. Source data and the destination snapshot are retained for review.')
     return result.stdout
@@ -45,7 +49,7 @@ def sql(statement):
     return run(['/usr/bin/mariadb', '--batch', '--skip-column-names'], statement)
 
 
-def database_users(plan, database):
+def database_users(plan, database, allow_empty=False):
     if not IDENTIFIER.fullmatch(database) or database.lower() in {'mysql', 'sys', 'performance_schema', 'information_schema', 'grommunio'}:
         raise ImportError('Unsupported or protected database name in the backup.')
     result = []
@@ -65,7 +69,7 @@ def database_users(plan, database):
             if not privileges:
                 raise ImportError('Database grants could not be read from the backup.')
             result.append({'username': username, 'host': host, 'hash': hashed.upper(), 'privileges': privileges})
-    if not result: raise ImportError('Database credentials are missing from the backup.')
+    if not result and not allow_empty: raise ImportError('Database credentials are missing from the backup: ' + database + '. Review source grants before allowing an orphaned database.')
     return result
 
 
@@ -81,6 +85,9 @@ def runtime_settings():
             raise ImportError('Invalid PHP selector mapping.')
     if type(value.get('homeserver', 0)) is not int or not 0 <= value.get('homeserver', 0) <= 65535:
         raise ImportError('Invalid Grommunio home server.')
+    orphaned = value.get('databases_without_users', [])
+    if not isinstance(orphaned, list) or any(not isinstance(name, str) or not IDENTIFIER.fullmatch(name) for name in orphaned):
+        raise ImportError('Invalid reviewed orphaned database list.')
     return value
 
 
@@ -103,6 +110,19 @@ def database_collation(plan, database):
     if source_charset and source_charset != charset and {source_charset, charset} != {'utf8', 'utf8mb3'}:
         raise ImportError('Source and destination database character sets differ.')
     return charset, value
+
+
+def new_primary_group(username):
+    # Never join an existing system group merely because its name matches an
+    # imported username (Ubuntu's admin group can confer elevated privileges).
+    try: grp.getgrnam(username)
+    except KeyError: return None
+    alternate = 'mp_' + username
+    if len(alternate) > 32:
+        alternate = 'mp_' + username[:20] + '_' + hashlib.sha256(username.encode()).hexdigest()[:8]
+    try: grp.getgrnam(alternate)
+    except KeyError: return alternate
+    raise ImportError('A destination group conflicts with the imported account: ' + alternate)
 
 
 def preflight(plans, options, completed, settings):
@@ -132,6 +152,7 @@ def preflight(plans, options, completed, settings):
             try: pwd.getpwnam(username)
             except KeyError: pass
             else: raise ImportError('System username already exists: ' + username + '. A partial restore requires operator review.')
+            new_primary_group(username)
             if (Path('/home') / username).exists(): raise ImportError('An account home directory already exists: ' + username)
             selectors = {d['php_selector'] for d in p['websites']}
             if len(selectors) > 1:
@@ -157,7 +178,7 @@ def preflight(plans, options, completed, settings):
                 if not version or not Path('/etc/php', version, 'fpm/pool.d').is_dir():
                     raise ImportError('Install and map PHP selector ' + selector + ' before importing ' + domain + '. No PHP version was silently changed.')
             for database in p['databases']:
-                users = database_users(p, database)
+                users = database_users(p, database, database in settings.get('databases_without_users', []))
                 database_collation(p, database)
                 if sql('SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME=' + sql_literal(database)) .strip():
                     raise ImportError('Destination database already exists: ' + database)
@@ -198,8 +219,8 @@ def extract_archive(path, destination, username=None):
             archive.extract(member, path=destination, filter='data')
 
 
-def restore_database(plan, database, stage, work):
-    users = database_users(plan, database)
+def restore_database(plan, database, stage, work, settings=None):
+    users = database_users(plan, database, database in (settings or {}).get('databases_without_users', []))
     charset, collation = database_collation(plan, database)
     sql(f'CREATE DATABASE `{database}` CHARACTER SET {charset} COLLATE {collation};')
     temporary = 'mp_import_' + secrets.token_hex(8)
@@ -305,12 +326,35 @@ def forwarders(plan):
     return result
 
 
+def create_mailbox(address, quota_bytes, homeserver):
+    if type(quota_bytes) is not int or quota_bytes < 0:
+        raise ImportError('Invalid mailbox quota.')
+    quota_kb = (quota_bytes + 1023) // 1024
+    if quota_kb > 2147483647: raise ImportError('Mailbox quota exceeds the supported Grommunio range.')
+    properties = ('storagequotalimit', 'prohibitsendquota', 'prohibitreceivequota')
+    options = []
+    if quota_kb:
+        for name in properties: options += ['--property', name + '=' + str(quota_kb)]
+    run(['/usr/sbin/grommunio-admin', 'user', 'create', '--homeserver', str(homeserver),
+         '--pop3-imap', 'true', '--privWeb', 'true', '--smtp', 'true', '--lang', 'en_US',
+         *options, address], timeout=180)
+    if not quota_kb:
+        # DirectAdmin zero means unlimited; Gromox zero means a full mailbox.
+        # Remove limits, including inherited template limits, for unlimited mail.
+        options = []
+        for name in properties: options += ['--remove-property', name]
+        run(['/usr/sbin/grommunio-admin', 'user', 'modify', address, *options], timeout=180)
+
+
 def restore_account(plan, stage, work, options, settings, panel, actor):
     import helper
     username = plan['username']; account = plan['account']
     suspended = plan['locked'] or account.get('suspended') == 'yes'
     shell = '/bin/bash' if account.get('ssh') == 'ON' else '/usr/sbin/nologin'
-    run(['/usr/sbin/useradd', '--create-home', '--shell', '/usr/sbin/nologin', '--', username])
+    group = new_primary_group(username)
+    if group: run(['/usr/sbin/groupadd', '--', group])
+    group_options = ['--gid', group] if group else ['--user-group']
+    run(['/usr/sbin/useradd', '--create-home', '--shell', '/usr/sbin/nologin', *group_options, '--', username])
     system = pwd.getpwnam(username); home = Path(system.pw_dir)
     # Keep logins locked until every account component has been restored.
     run(['/usr/sbin/chpasswd', '-e'], username + ':!' + plan['hash'] + '\n')
@@ -326,7 +370,7 @@ def restore_account(plan, stage, work, options, settings, panel, actor):
         if source.is_dir():
             run(['/usr/bin/rsync', '-a', '--safe-links', '--chown=' + username + ':' + grp.getgrgid(system.pw_gid).gr_name,
                  str(source), str(home) + '/'], timeout=14400)
-    for database in plan['databases']: restore_database(plan, database, stage, work)
+    for database in plan['databases']: restore_database(plan, database, stage, work, settings)
     stamp = panel.now()
     with panel.db() as conn:
         role = 'admin' if account.get('usertype') == 'admin' else 'client'
@@ -372,19 +416,15 @@ def restore_account(plan, stage, work, options, settings, panel, actor):
             domains = [d['domain'] for d in plan['domains']]
             if primary not in domains: primary = domains[0] if domains else None
             if not primary: raise ImportError('A database has no owning website domain: ' + database)
-            db_users = database_users(plan, database)
+            db_users = database_users(plan, database, database in settings.get('databases_without_users', []))
             conn.execute('INSERT INTO imported_databases(owner,domain,db_name,db_user,created_at,created_by) VALUES(?,?,?,?,?,?)',
-                         (username, primary, database, db_users[0]['username'], stamp, actor))
+                         (username, primary, database, db_users[0]['username'] if db_users else '', stamp, actor))
         conn.commit()
         for mailbox in plan['mailboxes']:
             address = mailbox['address']; local, domain = address.split('@')
             quotas = dict(line.split(':', 1) for line in plan['metadata'].get(domain + '/email/quota', '').splitlines() if ':' in line)
             quota_bytes = int(quotas.get(local, '0'))
-            if quota_bytes < 0: raise ImportError('Invalid mailbox quota.')
-            quota_kb = (quota_bytes + 1023) // 1024
-            run(['/usr/sbin/grommunio-admin', 'user', 'create', '--homeserver', str(settings.get('homeserver', 0)),
-                 '--pop3-imap', 'true', '--privWeb', 'true', '--smtp', 'true', '--lang', 'en_US',
-                 '--property', 'storagequotalimit=' + str(quota_kb), address], timeout=180)
+            create_mailbox(address, quota_bytes, settings.get('homeserver', 0))
             sync_mailbox(mailbox, work / 'mail' / address, source_config(), suspended)
             conn.execute('INSERT INTO email_accounts(full_email,domain,localpart,status,created_at,created_by,mail_domain,quota_mb,password_hash) VALUES(?,?,?,?,?,?,?,?,?)',
                          (address, domain, local, 'suspended' if suspended or mailbox['hash'].startswith('!') else 'active', stamp, actor, domain, (quota_bytes + 1048575) // 1048576, '{GROMMUNIO}'))
