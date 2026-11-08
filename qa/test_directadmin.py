@@ -162,6 +162,17 @@ class DirectAdminTests(unittest.TestCase):
         for invalid in ('mysql', 'grommunio', 'name`; DROP DATABASE mysql;'):
             with self.assertRaises(importer.ImportError): database_users(plan, invalid)
 
+    def test_mail_progress_never_exposes_private_log_contents(self):
+        directory = Path(self.directory.name) / 'job'
+        log = directory / 'accounts/alice/mail/alice@example.com/imapsync.log'
+        log.parent.mkdir(parents=True)
+        (directory / 'ledger.json').write_text(json.dumps({'started':'alice'}))
+        log.write_text('password PRIVATE_SECRET\nSubject: PRIVATE_SUBJECT\nmsg INBOX/1 copied ETA: today 2/10 msgs left\n')
+        value = importer.mail_progress(directory, {'phase':'restoring'})
+        self.assertEqual(value, {'address':'alice@example.com','remaining':2,'total':10})
+        self.assertNotIn('PRIVATE', json.dumps(value))
+        self.assertIsNone(importer.mail_progress(directory, {'phase':'restored'}))
+
     def test_unlimited_mail_quota_is_not_zero_space(self):
         from directadmin_restore import create_mailbox
         with patch('directadmin_restore.run') as command:

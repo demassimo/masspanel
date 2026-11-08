@@ -330,6 +330,29 @@ def spawn(job, phase):
         raise ImportError('The background importer could not start. Check systemd on the server.')
 
 
+def mail_progress(path, state):
+    if state.get('phase') != 'restoring' or not (path / 'ledger.json').is_file(): return None
+    ledger = json.loads((path / 'ledger.json').read_text())
+    username = ledger.get('started')
+    if not isinstance(username, str) or not USER.fullmatch(username): return None
+    candidates = list((path / 'accounts' / username / 'mail').glob('*/imapsync.log'))
+    candidates = [p for p in candidates if p.is_file() and not p.is_symlink()
+                  and re.fullmatch(r'[a-z0-9._%+-]{1,64}@(?:[a-z0-9-]+\.)+[a-z]{2,63}', p.parent.name)]
+    if not candidates: return None
+    log = max(candidates, key=lambda p: p.stat().st_mtime)
+    with log.open('rb') as stream:
+        stream.seek(max(0, log.stat().st_size - 32768))
+        tail = stream.read(32768).decode('utf-8', errors='replace')
+    # Expose only numeric progress. Logs can contain credentials and subjects.
+    matches = re.findall(r' (\d+)/(\d+) msgs left', tail)
+    result = {'address': log.parent.name}
+    if matches:
+        remaining, total = map(int, matches[-1])
+        if 0 <= remaining <= total:
+            result.update(remaining=remaining, total=total)
+    return result
+
+
 def controller(payload):
     ROOT.mkdir(mode=0o700, parents=True, exist_ok=True)
     INCOMING.mkdir(mode=0o700, exist_ok=True)
@@ -359,7 +382,10 @@ def controller(payload):
     job = payload.get('job')
     path = job_path(job)
     if action == 'status':
-        return json.loads((path / 'status.json').read_text())
+        state = json.loads((path / 'status.json').read_text())
+        progress = mail_progress(path, state)
+        if progress: state['mail_progress'] = progress
+        return state
     if action == 'start':
         state = json.loads((path / 'status.json').read_text())
         if state.get('phase') not in {'ready', 'blocked', 'failed'} or not (path / 'plan.private.json').is_file():

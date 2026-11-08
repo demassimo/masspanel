@@ -60,6 +60,7 @@ export default function ImportsPage({ session }) {
       <h2>2. Review and restore</h2>
       <p role="status" aria-live="polite"><strong>{job.phase}</strong> — {job.message}</p>
       {running(job) && <progress value={job.progress || 0} max="100" aria-label="Import progress" />}
+      {job.mail_progress && <p>Copying {job.mail_progress.address}{Number.isInteger(job.mail_progress.total) && <>: {job.mail_progress.remaining.toLocaleString()} of {job.mail_progress.total.toLocaleString()} messages remaining in this pass</>}. Verification follows the copy.</p>}
       <p>{job.accounts?.length || 0} accounts · {(job.accounts || []).reduce((n, a) => n + a.domains.length, 0)} domains · {(job.accounts || []).reduce((n, a) => n + (a.websites || a.domains).length, 0)} websites · {(job.accounts || []).reduce((n, a) => n + a.mailboxes, 0)} mailboxes</p>
       <div style={{ overflowX: 'auto' }}><table><thead><tr><th>Username</th><th>Domains</th><th>Databases</th><th>Mailboxes</th><th>Passwords / status</th></tr></thead>
         <tbody>{(job.accounts || []).map(account => <tr key={account.username}><td>{account.username}</td><td>{(account.websites || account.domains).join(', ') || '—'}{account.warnings?.map((warning, i) => <p key={i}><small>{warning}</small></p>)}</td><td>{account.databases.length}</td><td>{account.mailboxes}</td><td>{account.passwords}{account.suspended && ' · suspended'}</td></tr>)}</tbody></table></div>
