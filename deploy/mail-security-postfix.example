@@ -1,0 +1,19 @@
+# Staged configuration only. Do not apply before explicit go-live authorization.
+# master.cf transport: one recipient per invocation; no shell interpolation.
+mpsecurity unix - n n - 4 pipe
+  flags=uh user=masspanel null_sender=<>
+  argv=/usr/bin/python3 /usr/local/libexec/masspanel-mail-security-pipe
+    --queue-id=${queue_id} --sender=${sender} --recipient=${recipient} --ip=${client_address}
+
+# main.cf (route only resolved local mailbox deliveries through this transport):
+# mpsecurity_destination_recipient_limit = 1
+# virtual_transport = mpsecurity:
+# Existing transport_maps may override virtual_transport; inspect them first.
+# Keep recipient verification, anti-relay controls, SPF/DKIM/DMARC checks and
+# outbound DKIM signing. Do not install a global sender-whitelist bypass.
+# Do not also reject content through a before-queue spam milter if the intent
+# is to retain that accepted content in this recoverable quarantine.
+
+# Gromox gromox.cfg:
+# lda_junk_rules = X-MassPanel-Spam=Yes
+# The delivery worker removes any sender-supplied X-MassPanel-* routing headers.

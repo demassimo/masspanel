@@ -8,7 +8,6 @@ import os
 import pwd
 import re
 import secrets
-import smtplib
 import spwd
 import subprocess
 import sys
@@ -2001,24 +2000,6 @@ def wordpress_action(payload):
     return {"domain": domain, "version": version, "action": action}
 
 
-def mail_quarantine_release(payload):
-    root = Path("/var/lib/masspanel/mail-quarantine").resolve()
-    path = Path(str(payload.get("path") or "")).resolve()
-    if path.parent != root or path.suffix != ".eml" or not path.is_file(): fail("Quarantined message is unavailable.")
-    recipients = payload.get("recipients")
-    if not isinstance(recipients, list): fail("Invalid quarantine recipients.")
-    recipients = list(dict.fromkeys(str(item).lower().strip() for item in recipients if valid_email_address(item)))
-    if not recipients or len(recipients) > 100: fail("The quarantined message has no valid recipients.")
-    if path.stat().st_size > 64 * 1024 * 1024: fail("Quarantined message is too large.")
-    raw = path.read_bytes()
-    try:
-        with smtplib.SMTP("127.0.0.1", 10026, timeout=30) as smtp:
-            refused = smtp.sendmail("", recipients, raw)
-    except (OSError, smtplib.SMTPException) as exc:
-        fail(f"Could not release the message: {exc}")
-    if refused: fail("The mail server refused one or more recipients.")
-    return {"released": True, "recipients": recipients}
-
 def updater_control(payload):
     action = str(payload.get("action", "status"))
     updater = "/usr/local/sbin/masspanel-update"
@@ -2095,7 +2076,6 @@ def main():
     elif operation == "database_tool_access": result = database_tool_access(payload)
     elif operation == "hosting_storage_usage": result = hosting_storage_usage(payload)
     elif operation == "filebrowser_workspace_sync": result = filebrowser_workspace_sync(payload)
-    elif operation == "mail_quarantine_release": result = mail_quarantine_release(payload)
     elif operation == "updater_control": result = updater_control(payload)
     elif operation == "mail_dns_plan": result = mail_dns_plan(payload)
     elif operation == "cloudflare_connect": result = cloudflare_connect(payload)

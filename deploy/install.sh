@@ -110,6 +110,7 @@ systemctl enable --now masspanel nginx
 systemctl restart nginx
 
 "${STAGE_DIR}/deploy/install-updater.sh"
+"${STAGE_DIR}/deploy/install-mail-security.sh"
 
 echo "MASSPANEL_URL=https://${PANEL_PUBLIC_HOST}:8443"
 echo "INITIAL_ADMIN_USERNAME=${PANEL_ADMIN_USERNAME}"

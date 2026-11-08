@@ -74,6 +74,12 @@ uploads, impersonation and email actions are disabled. SMTP is unavailable, so
 the example mailboxes cannot send or receive messages. Do not enter real
 credentials or customer data into the demo.
 
+## Mail security
+
+For staged Rspamd quarantine, mailbox-specific sender rules and the optional
+owner-configured Ollama connector, see [Mail security](docs/MAIL_SECURITY.md).
+The connector ships disabled with no server or model selected.
+
 ## Cloudflare credentials
 
 MassPanel does not ship with a Cloudflare account, token or Account ID. Each server owner optionally adds their own restricted API token in **Domains & DNS**. Connections belong to that MassPanel installation and can be removed by its owner. See [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md).

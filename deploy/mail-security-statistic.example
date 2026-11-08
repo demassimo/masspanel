@@ -1,0 +1,8 @@
+# Merge into /etc/rspamd/local.d/classifier-bayes.conf only at activation.
+# Configure Redis separately. Each scan MUST have exactly one Rcpt and matching
+# Deliver-To, supplied from the trusted Postfix envelope.
+backend = "redis";
+per_user = true;
+autolearn = false;
+# Disable any global grommunio-spam-run job. Imported/auto-routed Junk is not
+# user feedback. Never train all mailboxes into a shared Bayes pool.

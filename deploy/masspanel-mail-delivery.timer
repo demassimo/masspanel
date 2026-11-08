@@ -1,0 +1,10 @@
+[Unit]
+Description=Process accepted MassPanel mail deliveries
+
+[Timer]
+OnBootSec=30
+OnUnitInactiveSec=10
+Unit=masspanel-mail-delivery.service
+
+[Install]
+WantedBy=timers.target
