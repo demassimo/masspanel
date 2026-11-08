@@ -1944,7 +1944,13 @@ def wordpress_sso_install(payload):
     plugin_dir.mkdir(mode=0o755, exist_ok=True)
     os.chown(plugin_dir, account.pw_uid, account.pw_gid)
     content = r'''<?php
-/* Plugin Name: MassPanel Secure Administrator Access */
+/*
+Plugin Name: MassPanel Secure Administrator Access
+License: AGPL-3.0-or-later
+License URI: https://www.gnu.org/licenses/agpl-3.0.html
+SPDX-License-Identifier: AGPL-3.0-or-later
+This generated WordPress plugin is excluded from the MassPanel Hosting License.
+*/
 if (!defined('ABSPATH')) { exit; }
 add_action('init', function () {
     if (!isset($_GET['masspanel_impersonate']) || $_GET['masspanel_impersonate'] !== '1') { return; }

@@ -47,6 +47,8 @@ chown -R root:root /opt/masspanel/frontend
 
 # Publish the exact preferred source and licence notices used by this release.
 install -m 0644 -o root -g root "${STAGE_DIR}/LICENSE" /usr/share/doc/masspanel/LICENSE
+install -m 0644 -o root -g root "${STAGE_DIR}/LICENSING.md" /usr/share/doc/masspanel/LICENSING.md
+install -m 0644 -o root -g root "${STAGE_DIR}/licenses/AGPL-3.0-or-later.txt" /usr/share/doc/masspanel/licenses/AGPL-3.0-or-later.txt
 install -m 0644 -o root -g root "${STAGE_DIR}/NOTICE" /usr/share/doc/masspanel/NOTICE
 install -m 0644 -o root -g root "${STAGE_DIR}/SOURCE_OFFER.md" /usr/share/doc/masspanel/SOURCE_OFFER.md
 install -m 0644 -o root -g root "${STAGE_DIR}/THIRD_PARTY.md" /usr/share/doc/masspanel/THIRD_PARTY.md

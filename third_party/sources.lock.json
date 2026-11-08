@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "generated": "2026-08-28",
-  "masspanel_license": "AGPL-3.0-or-later",
+  "masspanel_license": "LicenseRef-MassPanel-Hosting-1.0",
   "modifications": [{"component":"grommunio Web","base_commit":"f26f375c3102006a899e2c25b3b7fc983ac7257b","date":"2026-08-28","path":"deploy/runtime-patches/class.webappauthentication.php","purpose":"Administrator-assisted mailbox access and suspended-mailbox handling","license":"AGPL-3.0-or-later"}],
   "sources": [
     {"name":"Gromox reference","version":"3.9","commit":"f05be4a3cab5b5f08db06af058025e9644efacc6","url":"https://github.com/grommunio/gromox","archive":"source-archives/gromox-3.9.tar.gz","sha256":"0B5125F8C2017037F7088E66B9BD8C52ADD960C2849B932346CEBEA5F7E393E7","license":"AGPL-3.0-or-later","status":"reference-source"},

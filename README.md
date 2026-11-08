@@ -1,12 +1,12 @@
-# MassPanel — Open-Source Hosting Control Panel
+# MassPanel — Source-Available Hosting Control Panel
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![License: MassPanel Hosting 1.0](https://img.shields.io/badge/License-MassPanel_Hosting_1.0-blue.svg)](LICENSE)
 [![Latest beta](https://img.shields.io/github/v/release/demassimo/masspanel?include_prereleases&label=public%20beta)](https://github.com/demassimo/masspanel/releases)
 [![Ubuntu 24.04 LTS](https://img.shields.io/badge/Ubuntu-24.04_LTS-E95420?logo=ubuntu&logoColor=white)](INSTALL.md)
 [![Live demo](https://img.shields.io/badge/demo-live-0878f9)](https://demo.masscomputing.co.za/)
 
 MassPanel is a free, self-hosted web-hosting control panel for Ubuntu 24.04
-LTS. It is an open-source alternative for people evaluating cPanel,
+LTS. It is a source-available alternative for people evaluating cPanel,
 DirectAdmin, Plesk, CyberPanel, HestiaCP or ISPConfig. MassPanel manages hosting
 customers, websites, domains, DNS, databases, applications, TLS certificates,
 backups, email and groupware from a single owner and customer portal.
@@ -34,7 +34,7 @@ a drop-in clone of any product named above.
 
 ## Why MassPanel?
 
-- **No mandatory subscription:** self-host the AGPL-licensed source.
+- **No mandatory subscription:** self-host under the MassPanel Hosting License; paid hosting and accounts are permitted.
 - **Web and groupware together:** website hosting plus Gromox and grommunio Web.
 - **Owner and customer portals:** packages, account limits, support and visible impersonation.
 - **DNS flexibility:** built-in authoritative DNS or optional per-server Cloudflare connections.
@@ -45,7 +45,7 @@ a drop-in clone of any product named above.
 
 | If you are searching for… | MassPanel approach |
 | --- | --- |
-| Open-source cPanel alternative | AGPL source, customer accounts, websites, DNS, email, databases and backups |
+| Self-hosted cPanel alternative | Available source, customer accounts, websites, DNS, email, databases and backups |
 | DirectAdmin alternative | Owner/customer workflow, packages, domain limits and reseller-oriented management |
 | CyberPanel alternative | Nginx-based hosting, application installation, TLS and firewall tools |
 | Plesk alternative | Unified website, mail, DNS, database and customer administration |
@@ -86,7 +86,7 @@ MassPanel does not ship with a Cloudflare account, token or Account ID. Each ser
 
 ## Source and licences
 
-MassPanel is licensed under `AGPL-3.0-or-later`. Commercial hosting, paid support and charging for copies are permitted, while recipients and network users retain the rights provided by the AGPL. Official builds may apply a 20-domain product tier; that policy does not remove anyone's AGPL right to inspect, modify and redistribute the source.
+Original MassPanel code uses the **MassPanel Hosting License 1.0**. You may sell hosting, hosted customer/reseller accounts and genuine installation or support services. Selling MassPanel copies, rebranded software or activation entitlements requires separate written authorization. Source inspection, modification and free redistribution remain permitted under the licence. MassPanel is source-available; separately licensed upstream components remain open source. Earlier AGPL releases retain their existing rights. Official builds may apply a 20-domain product tier; see [LICENSING.md](LICENSING.md) for the scope and entitlement details.
 
 MassPanel is independent and is not an official grommunio product. It deploys a documented modification to grommunio Web. See [NOTICE](NOTICE), [THIRD_PARTY.md](THIRD_PARTY.md), [SOURCE_OFFER.md](SOURCE_OFFER.md), and [LICENSING.md](LICENSING.md).
 
@@ -101,4 +101,4 @@ Do not report vulnerabilities in public issues.
 
 ## Keywords
 
-`hosting control panel` · `open-source cPanel alternative` · `DirectAdmin alternative` · `CyberPanel alternative` · `Plesk alternative` · `web hosting panel` · `Ubuntu hosting control panel` · `Nginx control panel` · `mail server control panel` · `Gromox` · `grommunio Web`
+`hosting control panel` · `source-available hosting panel` · `DirectAdmin alternative` · `CyberPanel alternative` · `Plesk alternative` · `web hosting panel` · `Ubuntu hosting control panel` · `Nginx control panel` · `mail server control panel` · `Gromox` · `grommunio Web`

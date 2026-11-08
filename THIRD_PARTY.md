@@ -1,6 +1,8 @@
 # Third-party software, licences and modifications
 
-MassPanel is an independent AGPL-3.0-or-later project. It is not affiliated
+Original MassPanel code is source-available under the MassPanel Hosting License
+1.0. This licence does not apply to separately licensed upstream components
+or add restrictions to their licences. MassPanel is not affiliated
 with or endorsed by any upstream project listed below. Product names identify
 compatible software only. Complete licence texts are retained in
 `third_party/licenses`, and pinned source is in `third_party/source-archives`.
@@ -42,9 +44,10 @@ be downloaded without authentication or charge. The optional
 `deploy/configure-grommunio-community.py` script also modifies the Admin API's
 local Community default capacity, preserving certificate verification and
 upstream notices. It installs original and modified source with notices;
-see `docs/GROMMUNIO_COMMUNITY.md`. MassPanel does not modify Gromox, Sync or DAV
-source. The optional imapsync installer retains the upstream NLPL notice and
-publishes its APPEND compatibility adjustment with the installed source.
+see `docs/GROMMUNIO_COMMUNITY.md`. The optional Gromox correction is documented
+below. MassPanel does not modify Sync or DAV source. The optional imapsync
+installer retains the upstream NLPL notice and publishes its APPEND
+compatibility adjustment with the installed source.
 
 ## Redistribution rules
 

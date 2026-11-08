@@ -1,5 +1,10 @@
 # Corresponding source
 
+Original MassPanel material uses the MassPanel Hosting License 1.0 in this
+revision. Separately licensed components and earlier AGPL releases retain their
+own terms; see [LICENSING.md](LICENSING.md). The source offer does not place
+MassPanel's no-resale restriction on any upstream component.
+
 This MassPanel release contains the preferred source form for MassPanel and
 the modifications it deploys. It also contains the exact upstream source
 revisions retained for the installed Grommunio and Gromox components.
