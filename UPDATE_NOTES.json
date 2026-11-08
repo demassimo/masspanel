@@ -1,7 +1,7 @@
 {
-  "summary": "Sanitized GitHub-linked public beta release",
+  "summary": "MassPanel Hosting License: paid hosting allowed; software resale requires authorization",
   "components": [
-    {"name": "MassPanel licence", "description": "Declares MassPanel AGPL-3.0-or-later with commercial use and paid support permitted."},
+    {"name": "MassPanel licence", "description": "Applies the MassPanel Hosting License 1.0 to original code, allowing paid hosting and accounts while requiring written authorization for software resale. Earlier AGPL rights and upstream licences remain intact."},
     {"name": "Grommunio declaration", "description": "Records the exact modified grommunio Web file, base commit, purpose and modification date."},
     {"name": "Corresponding source", "description": "Publishes the complete deployed source without authentication from the panel and mail hostnames."},
     {"name": "Licence notices", "description": "Installs upstream licence texts, source hashes, independence notice and redistribution guidance."},
@@ -11,7 +11,7 @@
     {"name": "Release sanitization", "description": "Rejects Cloudflare-token and private-key patterns and removes generated Python caches from release archives."},
     {"name": "Reliable updates", "description": "Avoids refreshing external package repositories when required firewall packages are already installed."},
     {"name": "Public source defaults", "description": "Removes the original deployment mail hostname fallback and adds GitHub community templates."},
-    {"name": "Licence discovery", "description": "Uses the standard AGPL text at the repository root while retaining upstream notices under third_party."},
+    {"name": "Licence discovery", "description": "Updates source-available labels, preserves the former AGPL text and documents separately licensed integration modules."},
     {"name": "GitHub source links", "description": "Links the panel and webmail disclosure pages to the public repository and matching version tag."},
     {"name": "Repository metadata exclusion", "description": "Excludes Git metadata, virtual environments and development dependencies from signed release archives."}
   ]

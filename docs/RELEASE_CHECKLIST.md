@@ -3,7 +3,10 @@
 ## Source and legal notices
 
 - [ ] Version and release tag match.
-- [ ] `LICENSE`, `NOTICE`, `THIRD_PARTY.md` and `SOURCE_OFFER.md` are current.
+- [ ] `LICENSE`, `LICENSING.md`, `NOTICE`, `THIRD_PARTY.md` and `SOURCE_OFFER.md` are current.
+- [ ] MassPanel source-available terms and separately licensed components are distinguished.
+- [ ] The historical AGPL text and integration-module exceptions are retained.
+- [ ] The licence transition commit and unchanged earlier release rights are documented.
 - [ ] Every bundled dependency has a declared source, version and licence.
 - [ ] Modified AGPL components identify changed files and corresponding source.
 - [ ] Compliance report passes and undeclared archives are rejected.
