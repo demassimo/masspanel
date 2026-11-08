@@ -54,6 +54,8 @@ printf '%s\n' '<!doctype html><html><head><meta charset="utf-8"><meta name="view
 install -m 0644 -o root -g root "$stage/deploy/nginx-masspanel.conf" /etc/nginx/sites-available/masspanel
 install -d -m 0755 -o root -g root /usr/share/doc/masspanel /usr/share/doc/masspanel/licenses /usr/share/masspanel/source /etc/grommunio-common/nginx/locations.d /etc/nginx/snippets
 install -m 0644 -o root -g root "$stage/LICENSE" /usr/share/doc/masspanel/LICENSE
+install -m 0644 -o root -g root "$stage/LICENSING.md" /usr/share/doc/masspanel/LICENSING.md
+install -m 0644 -o root -g root "$stage/licenses/AGPL-3.0-or-later.txt" /usr/share/doc/masspanel/licenses/AGPL-3.0-or-later.txt
 install -m 0644 -o root -g root "$stage/NOTICE" /usr/share/doc/masspanel/NOTICE
 install -m 0644 -o root -g root "$stage/SOURCE_OFFER.md" /usr/share/doc/masspanel/SOURCE_OFFER.md
 install -m 0644 -o root -g root "$stage/THIRD_PARTY.md" /usr/share/doc/masspanel/THIRD_PARTY.md

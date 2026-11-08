@@ -1,4 +1,6 @@
 <?php
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Grommunio integration module; excluded from the MassPanel Hosting License.
 declare(strict_types=1);
 $token = $_POST['token'] ?? '';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !is_string($token) || strlen($token) < 32 || strlen($token) > 128) {

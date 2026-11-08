@@ -1,6 +1,8 @@
 # Third-party software, licences and modifications
 
-MassPanel is an independent AGPL-3.0-or-later project. It is not affiliated
+Original MassPanel code is source-available under the MassPanel Hosting License
+1.0. This licence does not apply to separately licensed upstream components
+or add restrictions to their licences. MassPanel is not affiliated
 with or endorsed by any upstream project listed below. Product names identify
 compatible software only. Complete licence texts are retained in
 `third_party/licenses`, and pinned source is in `third_party/source-archives`.
