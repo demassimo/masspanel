@@ -9,6 +9,7 @@ import tempfile
 import unittest
 import atexit
 import shutil
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "backend"))
 STATE = Path(tempfile.mkdtemp(prefix="masspanel-tests-"))
 atexit.register(lambda: shutil.rmtree(STATE, ignore_errors=True))
 os.environ["MASSPANEL_STATE_DIR"] = str(STATE)
@@ -31,7 +33,7 @@ class BackendFeatureTests(unittest.TestCase):
     def setUp(self):
         panel.attempts.clear()
         with panel.db() as c:
-            for table in ("wordpress_impersonation_tokens", "mail_impersonation_tokens", "ticket_replies", "support_tickets", "store_orders", "store_products", "account_suspension_domains", "app_installations", "backups", "backup_schedules", "email_accounts", "dns_records", "user_databases", "website_redirects", "mail_domains", "domains", "account_feature_overrides", "accounts", "package_features", "hosting_packages", "audit"):
+            for table in ("imported_databases", "wordpress_impersonation_tokens", "mail_impersonation_tokens", "ticket_replies", "support_tickets", "store_orders", "store_products", "account_suspension_domains", "app_installations", "backups", "backup_schedules", "email_accounts", "dns_records", "user_databases", "website_redirects", "mail_domains", "domains", "account_feature_overrides", "accounts", "package_features", "hosting_packages", "audit"):
                 c.execute(f"DELETE FROM {table}")
             stamp = panel.now()
             for username, role, system in (("admin", "admin", None), ("alice", "client", "alice"), ("bob", "client", "bob")):
@@ -664,6 +666,57 @@ class BackendFeatureTests(unittest.TestCase):
         response = self.client.post(f"/api/backups/{backup_id}/restore", headers={"X-CSRF-Token": "token"})
         self.assertEqual(response.status_code, 500)
         self.assertFalse((STATE.parent / "escape.txt").exists())
+
+
+    def test_import_routes_require_admin_and_csrf(self):
+        self.login_as('alice', 'client', 'alice')
+        self.assertEqual(self.client.get('/api/imports/directadmin').status_code, 403)
+        self.assertEqual(self.client.post('/api/imports/directadmin', json={'action':'inspect','files':[]}, headers={'X-CSRF-Token':'token'}).status_code, 403)
+        self.login_as('admin', 'admin')
+        self.assertEqual(self.client.post('/api/imports/directadmin', json={'action':'inspect','files':['user.admin.alice.tar.gz']}).status_code, 403)
+        self.assertEqual(self.client.get('/api/imports/directadmin/not-a-job').status_code, 400)
+
+    def test_legacy_password_login_upgrades_without_reset(self):
+        try: import crypt
+        except ImportError: self.skipTest('Run legacy-hash verification on Ubuntu/Python 3.12.')
+        hashed = crypt.crypt('Existing-password!', '$6$exampleSalt$')
+        with panel.db() as conn:
+            conn.execute('UPDATE accounts SET password_hash=? WHERE username=?', (hashed, 'alice'))
+        response = self.client.post('/api/login', json={'username':'alice','password':'wrong-password'})
+        self.assertEqual(response.status_code, 401)
+        response = self.client.post('/api/login', json={'username':'alice','password':'Existing-password!'})
+        self.assertEqual(response.status_code, 200)
+        with panel.db() as conn:
+            value = conn.execute('SELECT password_hash FROM accounts WHERE username=?', ('alice',)).fetchone()[0]
+        self.assertTrue(value.startswith('$argon2'))
+        self.assertTrue(panel.ph.verify(value, 'Existing-password!'))
+
+    def test_imported_php_survives_ssl_and_suspension_changes(self):
+        with panel.db() as conn:
+            conn.execute('UPDATE domains SET php_enabled=1 WHERE domain=?', ('alice.example.com',))
+        self.login_as('admin', 'admin')
+        for action, payload in (('ssl', {'mode':'imported'}), ('suspend', {}), ('unsuspend', {})):
+            response = self.client.post('/api/domains/alice.example.com/' + action,
+                headers={'X-CSRF-Token':'token'}, json=payload)
+            self.assertEqual(response.status_code, 200)
+            call = [c for c in self.helper_calls if c['operation']=='domain_config'][-1]
+            self.assertTrue(call['wordpress'])
+
+    def test_imported_database_is_owner_scoped_and_protects_domain_deletion(self):
+        with panel.db() as conn:
+            cursor = conn.execute('INSERT INTO imported_databases(owner,domain,db_name,db_user,created_at,created_by) VALUES(?,?,?,?,?,?)',
+                ('alice','alice.example.com','alice_legacy','alice_original',panel.now(),'admin'))
+            ref = 'import-' + str(cursor.lastrowid)
+        self.login_as('bob', 'client', 'bob')
+        self.assertNotIn('alice_legacy', self.client.get('/api/databases').get_data(as_text=True))
+        with panel.app.test_request_context():
+            panel.session.update(role='client',system_username='bob')
+            self.assertIsNone(panel._managed_database(ref))
+        self.login_as('alice', 'client', 'alice')
+        self.assertIn('alice_legacy', self.client.get('/api/databases').get_data(as_text=True))
+        self.login_as('admin', 'admin')
+        response = self.client.delete('/api/domains/alice.example.com',headers={'X-CSRF-Token':'token'})
+        self.assertEqual(response.status_code,409)
 
 
 if __name__ == "__main__":

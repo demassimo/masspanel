@@ -3,3 +3,4 @@ argon2-cffi==25.1.0
 gunicorn==23.0.0
 psutil==7.0.0
 cryptography==45.0.6
+dnspython==2.8.0

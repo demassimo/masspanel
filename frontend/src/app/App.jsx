@@ -17,6 +17,7 @@ const pages = {
   files: lazy(() => import('../pages/FilesPage.jsx')),
   databases: lazy(() => import('../pages/DatabasesPage.jsx')),
   backups: lazy(() => import('../pages/BackupsPage.jsx')),
+  imports: lazy(() => import('../pages/ImportsPage.jsx')),
   dns: lazy(() => import('../pages/DomainsPage.jsx')),
   email: lazy(() => import('../pages/MailPage.jsx')),
   security: lazy(() => import('../pages/MailSecurityPage.jsx')),

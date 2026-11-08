@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { readFile, writeFile } from 'node:fs/promises'
 
-const routeEntries = ['dashboard','users','websites','applications','tools','storefront','files','databases','backups','domains','mail','mail-security','firewall','storage','updates','certificates','support','activity','licences','open-source','settings']
+const routeEntries = ['dashboard','users','websites','applications','tools','storefront','files','databases','backups','imports','domains','mail','mail-security','firewall','storage','updates','certificates','support','activity','licences','open-source','settings']
 
 function routeHtmlEntries() {
   return { name: 'masspanel-route-html', async closeBundle() {

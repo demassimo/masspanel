@@ -15,6 +15,9 @@ if test -f "$stage/deploy/write-runtime-lock.py"; then
   /usr/local/libexec/masspanel-write-runtime-lock
 fi
 install -m 0640 -o root -g masspanel "$stage/backend/app.py" /opt/masspanel/backend/app.py
+for module in passwords.py directadmin_import.py directadmin_restore.py directadmin_mail.py directadmin_mail_verify.py; do
+  install -m 0640 -o root -g masspanel "$stage/backend/$module" "/opt/masspanel/backend/$module"
+done
 install -m 0640 -o root -g masspanel "$stage/backend/helper.py" /opt/masspanel/backend/helper.py
 install -m 0750 -o root -g masspanel "$stage/backend/scheduled_backup.py" /opt/masspanel/backend/scheduled_backup.py
 install -m 0644 -o root -g masspanel "$stage/backend/license_public.pem" /opt/masspanel/backend/license_public.pem

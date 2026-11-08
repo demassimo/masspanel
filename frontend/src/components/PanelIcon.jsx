@@ -16,7 +16,7 @@ import Settings from '../vendor/lucide/settings.js';
 
 const icons = {
   overview: LayoutDashboard, users: Users, websites: Monitor, apps: Blocks, tools: Settings, store: Globe, files: Folder,
-  databases: Database, backups: ArchiveRestore, dns: Globe, email: Mail, security: ShieldCheck, firewall: ShieldCheck, ssl: ShieldCheck,
+  databases: Database, backups: ArchiveRestore, imports: ArchiveRestore, dns: Globe, email: Mail, security: ShieldCheck, firewall: ShieldCheck, ssl: ShieldCheck,
   tickets: LifeBuoy, audit: Activity, licenses: Scale, storage: Database, updates: ArchiveRestore, settings: Settings,
 };
 

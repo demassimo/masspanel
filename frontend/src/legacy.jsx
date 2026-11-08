@@ -12,11 +12,11 @@ import PanelIcon from './components/PanelIcon.jsx';
 const pageLabel = {
   overview: 'Dashboard', users: 'Users', websites: 'Websites', apps: 'App Installer', files: 'File manager',
   tools: 'Hosting tools', store: 'Storefront',
-  databases: 'Databases', backups: 'Backups', dns: 'Domains & DNS', email: 'Email & Groupware',
+  databases: 'Databases', backups: 'Backups', imports: 'DirectAdmin import', dns: 'Domains & DNS', email: 'Email & Groupware',
   security: 'Mail security', firewall: 'Firewall', storage: 'Server storage', updates: 'Updates', ssl: 'Certificates', tickets: 'Support', audit: 'Activity', licenses: 'Licences', settings: 'Settings',
 };
 
-const ADMIN_PAGES = ['overview', 'users', 'websites', 'apps', 'tools', 'store', 'files', 'databases', 'backups', 'dns', 'email', 'security', 'firewall', 'storage', 'updates', 'ssl', 'tickets', 'audit', 'licenses', 'settings'];
+const ADMIN_PAGES = ['overview', 'users', 'websites', 'apps', 'tools', 'store', 'files', 'databases', 'backups', 'imports', 'dns', 'email', 'security', 'firewall', 'storage', 'updates', 'ssl', 'tickets', 'audit', 'licenses', 'settings'];
 const CLIENT_PAGES = ['overview', 'websites', 'apps', 'tools', 'files', 'databases', 'backups', 'dns', 'email', 'security', 'ssl', 'tickets', 'licenses', 'settings'];
 const PAGE_FEATURE = { websites:'websites', apps:'wordpress', files:'files', databases:'databases', backups:'backups', dns:'dns', email:'mail', security:'mail', ssl:'ssl', tickets:'support' };
 function pagesForSession(session) {
@@ -638,6 +638,7 @@ function Websites({ session }) {
                       <option value="disabled">Disabled</option>
                       <option value="self">Self cert</option>
                       <option value="letsencrypt">Let's Encrypt</option>
+                      {d.ssl_mode === 'imported' && <option value="imported">Imported certificate</option>}
                     </select>
                   </td>
                   <td>{d.created_at}</td>
@@ -1848,6 +1849,7 @@ function Ssl({ session }) {
                       <option value="disabled">Disabled</option>
                       <option value="self">Self-signed</option>
                       <option value="letsencrypt">Let's Encrypt</option>
+                      {r.ssl_mode === 'imported' && <option value="imported">Imported certificate</option>}
                     </select>
                   </td>
                   <td className="certificate-actions"><button className="primary" onClick={() => save(r.domain)} disabled={busy === r.domain}>Save</button>{r.ssl_mode === 'letsencrypt' && <button className="secondary" onClick={() => regenerate(r.domain)} disabled={busy === r.domain}>{busy === r.domain ? 'Regenerating…' : 'Regenerate certificate'}</button>}</td>

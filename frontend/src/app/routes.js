@@ -8,6 +8,7 @@ export const ROUTES = {
   files: '/files',
   databases: '/databases',
   backups: '/backups',
+  imports: '/imports',
   dns: '/domains',
   email: '/mail',
   security: '/mail-security',
