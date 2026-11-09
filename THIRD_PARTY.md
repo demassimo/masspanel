@@ -44,9 +44,10 @@ be downloaded without authentication or charge. The optional
 `deploy/configure-grommunio-community.py` script also modifies the Admin API's
 local Community default capacity, preserving certificate verification and
 upstream notices. It installs original and modified source with notices;
-see `docs/GROMMUNIO_COMMUNITY.md`. MassPanel does not modify Gromox, Sync or DAV
-source. The optional imapsync installer retains the upstream NLPL notice and
-publishes its APPEND compatibility adjustment with the installed source.
+see `docs/GROMMUNIO_COMMUNITY.md`. The optional Gromox correction is documented
+below. MassPanel does not modify Sync or DAV source. The optional imapsync
+installer retains the upstream NLPL notice and publishes its APPEND
+compatibility adjustment with the installed source.
 
 ## Redistribution rules
 

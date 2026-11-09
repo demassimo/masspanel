@@ -1,0 +1,19 @@
+[Unit]
+Description=Deliver accepted MassPanel mail copies to local Gromox
+After=masspanel.service gromox-delivery.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=1h
+User=masspanel
+Group=masspanel
+WorkingDirectory=/opt/masspanel/backend
+EnvironmentFile=/etc/masspanel/masspanel.env
+ExecStart=/opt/masspanel/venv/bin/python /opt/masspanel/backend/mail_security_worker.py
+UMask=0077
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/masspanel
+
